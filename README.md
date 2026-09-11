@@ -6,6 +6,12 @@ Every monitor switches workspace **together**, instead of Omarchy's default of
 independent per-monitor workspaces. The bar shows `D1 D2` instead of
 workspaces `1-5`.
 
+Built with Claude Code.
+
+## Why
+
+I like the way KDE handled this with virtual desktops as opposed to independent workspaces. I typically only have 2 "workspaces" that I swap back and forth between with SUPER + F and I wanted this ability in Omarchy.
+
 ## Model
 
 A desktop owns one workspace per monitor:
