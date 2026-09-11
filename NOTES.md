@@ -368,14 +368,18 @@ stock widget came back in its original slot.
 
 Removal still leaves Hyprland untouched, so the bindings persist in memory
 after the plugin directory is gone — `SUPER+2` keeps jumping to a Tandem
-desktop while the stock bindings stay unbound. `body.lua` repairs this: it
-checks whether its own generated file still exists on `workspace.active` and
-`window.open`, and runs `hyprctl reload` once when the file is gone. The
-loader is a `pcall`, so after that reload the file is simply not loaded.
+desktop while the stock bindings stay unbound. `body.lua` repairs this inside
+`show()`: if its own generated file is gone it runs `hyprctl reload` once and
+returns. The loader is a `pcall`, so after that reload the file is not loaded
+and the stock bindings come back.
 
-Hooked to events rather than `hl.timer` deliberately: no idle cost, and the
-repair fires exactly when the stale bindings are used.
+The check belongs in `show()`, not on an event. `show()` moves monitors with
+`monitor:set_workspace`, which does **not** emit `workspace.active`, so a
+version hooked to that event healed nothing when a stale binding was pressed —
+it only fired for `hl.dsp.focus`, which is what the test used but not what the
+bindings use. Every binding this config owns reaches `show()`, so that is the
+one place guaranteed to run.
 
-Testing note: `workspace.active` only fires on an actual change. Dispatching
-to the workspace already showing produces no event, which looked twice like
-the heal was broken when the test was.
+Testing note: exercise the real path (`tandem_show(2)`, what SUPER+2 runs),
+not `hl.dsp.focus`. And `workspace.active` fires only on an actual change —
+dispatching to the workspace already showing emits nothing.
