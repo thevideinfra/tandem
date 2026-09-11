@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "videinfra.tandem-settings",
+  "name": "Tandem Settings",
+  "version": "1.0.0",
+  "author": "videinfra",
+  "description": "Settings panel for Tandem virtual desktops",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Tandem Settings",
+    "description": "Settings panel for Tandem virtual desktops",
+    "category": "Compositor",
+    "allowMultiple": false
+  }
+}

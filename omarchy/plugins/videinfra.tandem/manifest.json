@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "videinfra.tandem",
+  "name": "Tandem",
+  "version": "2.0.0",
+  "author": "videinfra",
+  "description": "Virtual desktops that move every monitor together",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Tandem",
+    "description": "Virtual desktops that move every monitor together",
+    "category": "Compositor",
+    "allowMultiple": false
+  }
+}
