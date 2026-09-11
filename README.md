@@ -157,9 +157,11 @@ Two things `plugin remove` does not do:
 
 - It leaves `videinfra.tandem-settings` installed, and its panel calls
   `tandem-config`, which is gone. Remove it too, or use `./uninstall.sh`.
-- It does not touch Hyprland, so the desktop bindings stay live until the next
-  `hyprctl reload`. The loader line is a `pcall`, so after that reload stock
-  workspaces return and `hyprctl configerrors` stays clean.
+- It does not touch Hyprland, so the desktop bindings stay live in memory:
+  `SUPER+2` still jumps to a Tandem desktop and the stock per-monitor
+  bindings stay unbound. Tandem repairs this itself — it watches for its own
+  generated file disappearing and reloads once, on the next desktop switch or
+  new window. Run `hyprctl reload` to force it immediately.
 
 Omarchy has **no plugin uninstall hook** — `omarchy-plugin-remove` is `rm -rf`
 plus a `shell.json` edit, and the manifest schema has no lifecycle fields. So
