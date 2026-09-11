@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# Interactive setup for the Virtual Desktops plugin.
+#
+# Asks how many desktops and which keys, writes the answers into the plugin's
+# settings in shell.json, then hands off to tandem-apply to regenerate the
+# Hyprland config. Non-interactive callers should edit shell.json and run
+# tandem-apply directly.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHELL_JSON="${OMARCHY_SHELL_JSON:-$HOME/.config/omarchy/shell.json}"
+
+for tool in gum jq; do
+  command -v $tool >/dev/null || { echo "tandem-setup: $tool is required" >&2; exit 1; }
+done
+[[ -f $SHELL_JSON ]] || { echo "tandem-setup: $SHELL_JSON not found" >&2; exit 1; }
+
+current() { jq -r --arg k "$1" --arg d "$2" \
+  '[.. | objects | select(.id == "videinfra.tandem")
+     | (del(.id) | del(.settings)) + (.settings // {})] | first // {}
+   | if has($k) and .[$k] != null then .[$k] else $d end' "$SHELL_JSON"; }
+
+echo "Virtual Desktops setup"
+echo
+
+# --- monitors ---------------------------------------------------------------
+mapfile -t rows < <(hyprctl monitors -j \
+  | jq -r 'sort_by(.y, .x) | .[] | "\(.name)\t\(.width)x\(.height)\t\(.x),\(.y)"')
+count=${#rows[@]}
+# Stacked screens differ in y, side-by-side ones in x. Label whichever axis
+# actually varies, so "top/bottom" is never guessed at for a horizontal setup.
+distinct_y=$(hyprctl monitors -j | jq -r '[.[].y] | unique | length')
+if (( distinct_y > 1 )); then first_label=top; last_label=bottom
+else first_label=left; last_label=right; fi
+
+echo "Detected monitors, in order:"
+for i in "${!rows[@]}"; do
+  IFS=$'\t' read -r name res pos <<<"${rows[$i]}"
+  label=""
+  if (( count > 1 )); then
+    if   (( i == 0 ));         then label="$first_label"
+    elif (( i == count - 1 )); then label="$last_label"
+    else                            label="middle"; fi
+  fi
+  printf "  %d. %-10s %-11s at %-10s %s\n" \
+    "$((i + 1))" "$name" "$res" "$pos" "${label:+($label)}"
+done
+echo
+echo "Desktop 1 puts workspace 1 on the first monitor, 2 on the second, and so on."
+if gum confirm "Use this order?"; then
+  monitors_json=null   # omit the key; tandem-apply autodetects the same way
+else
+  echo "Enter monitor names in order, space separated (e.g. DP-1 DP-3):"
+  read -r -a picked
+  [[ ${#picked[@]} -gt 0 ]] || { echo "tandem-setup: no monitors given" >&2; exit 1; }
+  monitors_json=$(printf '%s\n' "${picked[@]}" | jq -R . | jq -sc .)
+fi
+
+# --- desktops ---------------------------------------------------------------
+desktops=$(gum choose --header "How many virtual desktops?" \
+  --selected "$(current desktops 2)" 2 3 4 5 6)
+[[ -n $desktops ]] || exit 1
+
+# --- keys -------------------------------------------------------------------
+toggle=$(gum input --header "Key to go to the next desktop" \
+  --value "$(current toggle "SUPER + F")")
+send=$(gum input --header "Key to send the focused window to the next desktop" \
+  --value "$(current send "SUPER + SHIFT + F")")
+[[ -n $toggle && -n $send ]] || { echo "tandem-setup: keys cannot be empty" >&2; exit 1; }
+
+# One question per binding. A gum multi-select needs space to tick each row and
+# enter only confirms what is already ticked, so pressing enter on a highlighted
+# row silently selects nothing -- too easy to read as "yes" and end up with the
+# bindings quietly disabled.
+ask() {
+  local prompt=$1 current=$2
+  if [[ $current == true ]]; then
+    gum confirm --default=yes "$prompt" && echo true || echo false
+  else
+    gum confirm --default=no "$prompt" && echo true || echo false
+  fi
+}
+
+echo
+numbers=$(ask "Bind SUPER+1..$desktops to jump straight to a desktop?" "$(current numbers true)")
+tab=$(ask "Bind SUPER+TAB / SUPER+SHIFT+TAB to cycle desktops?" "$(current tab true)")
+scroll=$(ask "Bind SUPER+scroll to cycle desktops?" "$(current scroll true)")
+separator=$(ask "Draw a | between desktops in the bar?" "$(current separator false)")
+
+echo
+echo "  SUPER+1..$desktops: $numbers"
+echo "  SUPER+TAB:        $tab"
+echo "  SUPER+scroll:     $scroll"
+echo "  separator:        $separator"
+echo
+
+# --- desktop names ----------------------------------------------------------
+existing_labels=$(jq -c '[.. | objects | select(.id == "videinfra.tandem") | (del(.id) | del(.settings)) + (.settings // {})] | first // {} | .labels // null' "$SHELL_JSON")
+default_label() { printf 'D%s' "$1"; }
+
+echo
+if gum confirm --default=no "Give the desktops custom names? (default is D1..D$desktops)"; then
+  labels="[]"
+  for i in $(seq 1 "$desktops"); do
+    current=$(jq -r --argjson i "$i" 'if type == "array" and length >= $i then .[$i-1] else null end' \
+      <<<"$existing_labels")
+    [[ $current == null || -z $current ]] && current=$(default_label "$i")
+    name=$(gum input --header "Name for desktop $i" --value "$current")
+    [[ -n $name ]] || name=$(default_label "$i")
+    labels=$(jq -c --arg n "$name" '. + [$n]' <<<"$labels")
+  done
+  echo "  names: $(jq -r 'join(", ")' <<<"$labels")"
+else
+  labels=null
+fi
+
+# --- write settings ---------------------------------------------------------
+settings=$(jq -nc \
+  --argjson labels "$labels" \
+  --argjson monitors "$monitors_json" \
+  --argjson desktops "$desktops" \
+  --arg toggle "$toggle" --arg send "$send" \
+  --argjson numbers "$numbers" --argjson tab "$tab" --argjson scroll "$scroll" \
+  --argjson separator "$separator" \
+  '{desktops: $desktops, toggle: $toggle, send: $send,
+    numbers: $numbers, tab: $tab, scroll: $scroll, separator: $separator}
+   | if $monitors == null then . else .monitors = $monitors end
+   | if $labels   == null then . else .labels   = $labels   end')
+
+cp "$SHELL_JSON" "$SHELL_JSON.bak.$(date +%s)"
+tmp=$(mktemp)
+jq --argjson s "$settings" \
+  '(.. | objects | select(.id == "videinfra.tandem")) |= ({id} + $s)' \
+  "$SHELL_JSON" >"$tmp"
+jq -e '[.. | objects | select(.id == "videinfra.tandem")] | length > 0' "$tmp" >/dev/null \
+  || { echo "tandem-setup: widget not found in shell.json -- add it to the bar first" >&2
+       rm -f "$tmp"; exit 1; }
+mv "$tmp" "$SHELL_JSON"
+echo "Saved settings to $SHELL_JSON (backed up first)."
+echo
+
+exec "$HERE/tandem-apply"

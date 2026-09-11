@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Read and write the Virtual Desktops settings.
+#
+# The settings panel is a thin front-end over this script, so all validation
+# and file handling stays in one tested place rather than being reimplemented
+# in QML.
+#
+#   tandem-config get                 print settings + detected monitors as JSON
+#   tandem-config set <key> <value>   update one key, then regenerate config
+#   tandem-config set-json <object>   update several keys in one go
+#
+# Keys: desktops (1-10), toggle, send (key specs), numbers, tab, scroll (bools),
+#       labels (JSON array of names, or null for the D1..Dn default),
+#       separator (bool; draw a | between entries).
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHELL_JSON="${OMARCHY_SHELL_JSON:-$HOME/.config/omarchy/shell.json}"
+
+command -v jq >/dev/null || { echo "tandem-config: jq is required" >&2; exit 1; }
+[[ -f $SHELL_JSON ]] || { echo "tandem-config: $SHELL_JSON not found" >&2; exit 1; }
+
+settings() {
+  # Bar entries carry widget settings as flat keys (BarModel.entrySettings
+  # copies every key but id), so that is where these live. Any older nested
+  # "settings" object is merged up and dropped on the next write.
+  jq -c '[.. | objects | select(.id == "videinfra.tandem") | (del(.id) | del(.settings)) + (.settings // {})] | first // {}' "$SHELL_JSON"
+}
+
+case "${1:-get}" in
+get)
+  monitors=$(hyprctl monitors -j 2>/dev/null \
+    | jq -c 'sort_by(.y, .x) | [.[] | {name, width, height, x, y}]' 2>/dev/null || echo '[]')
+  # Fill defaults so the panel never has to know them.
+  settings | jq -c --argjson monitors "$monitors" '
+    {
+      desktops: (if has("desktops") and .desktops != null then .desktops else 2 end),
+      toggle:   (if has("toggle")   and .toggle   != null then .toggle   else "SUPER + F" end),
+      send:     (if has("send")     and .send     != null then .send     else "SUPER + SHIFT + F" end),
+      numbers:  (if has("numbers")  and .numbers  != null then .numbers  else true end),
+      tab:      (if has("tab")      and .tab      != null then .tab      else true end),
+      scroll:   (if has("scroll")   and .scroll   != null then .scroll   else true end),
+      separator:(if has("separator") and .separator!= null then .separator else false end),
+      monitors: (if has("monitors") and .monitors != null then .monitors else null end),
+      labels:   (if has("labels")   and .labels   != null then .labels   else null end),
+      detected: $monitors
+    }'
+  ;;
+
+set | set-json)
+  # Validate one key/value and echo it back as JSON. Shared by both writers so
+  # a batched apply cannot sneak past the checks a single set enforces.
+  validate() {
+  local key=$1 value=$2
+  case "$key" in
+  desktops)
+    [[ $value =~ ^[0-9]+$ ]] && (( value >= 1 && value <= 10 )) \
+      || { echo "tandem-config: desktops must be 1-10" >&2; return 1; }
+    json=$value
+    ;;
+  numbers | tab | scroll | separator)
+    [[ $value == true || $value == false ]] \
+      || { echo "tandem-config: $key must be true or false" >&2; return 1; }
+    json=$value
+    ;;
+  labels)
+    # A JSON array of names, one per desktop. Empty array clears back to D1..Dn.
+    jq -e 'type == "array" and (length <= 10)
+           and all(.[]; type == "string" and length > 0 and length <= 16
+                        and (test("\"") | not))' <<<"$value" >/dev/null 2>&1 \
+      || { echo "tandem-config: labels must be up to 10 names, 1-16 chars, no quotes" >&2; return 1; }
+    json=$value
+    ;;
+  toggle | send)
+    [[ -n $value && $value != *'"'* ]] \
+      || { echo "tandem-config: $key is not a usable key spec" >&2; return 1; }
+    json=$(jq -nc --arg v "$value" '$v')
+    ;;
+  *)
+    echo "tandem-config: unknown key '$key'" >&2; return 1 ;;
+  esac
+  printf '%s' "$json"
+  }
+
+  if [[ ${1} == set ]]; then
+    key="${2:-}"; value="${3:-}"
+    [[ -n $key ]] || { echo "tandem-config: set needs a key" >&2; exit 1; }
+    validated=$(validate "$key" "$value") || exit 1
+    patch=$(jq -nc --arg k "$key" --argjson v "$validated" '{($k): $v}')
+  else
+    # set-json takes one flat object and applies every key at once, so the
+    # panel can batch several edits into a single regenerate + reload.
+    raw="${2:-}"
+    [[ -n $raw ]] || { echo "tandem-config: set-json needs a JSON object" >&2; exit 1; }
+    jq -e 'type == "object"' <<<"$raw" >/dev/null 2>&1 \
+      || { echo "tandem-config: set-json needs a JSON object" >&2; exit 1; }
+    patch='{}'
+    while IFS= read -r key; do
+      [[ -n $key ]] || continue
+      if [[ $key == labels ]]; then
+        value=$(jq -c --arg k "$key" '.[$k]' <<<"$raw")
+      else
+        value=$(jq -r --arg k "$key" '.[$k] | if type == "string" then . else tostring end' <<<"$raw")
+      fi
+      validated=$(validate "$key" "$value") || exit 1
+      patch=$(jq -nc --argjson p "$patch" --arg k "$key" --argjson v "$validated" '$p + {($k): $v}')
+    done < <(jq -r 'keys[]' <<<"$raw")
+  fi
+
+  jq -e '[.. | objects | select(.id == "videinfra.tandem")] | length > 0' "$SHELL_JSON" >/dev/null \
+    || { echo "tandem-config: widget not in shell.json -- add it to the bar first" >&2; exit 1; }
+
+  cp "$SHELL_JSON" "$SHELL_JSON.bak.$(date +%s)"
+  tmp=$(mktemp)
+  jq --argjson patch "$patch" \
+    '(.. | objects | select(.id == "videinfra.tandem")) |=
+       ((del(.settings)) + (.settings // {}) + $patch)' \
+    "$SHELL_JSON" >"$tmp"
+  mv "$tmp" "$SHELL_JSON"
+
+  # Labels only affect the bar widget, which reads shell.json directly. Skip
+  # the regenerate-and-reload when nothing the compositor cares about changed.
+  if [[ $(jq -r 'keys - ["labels", "separator"] | length' <<<"$patch") == 0 ]]; then
+    # Labels and the separator live only in injected settings, which the bar
+    # refreshes just when it rebuilds the widget. Restart the shell so the
+    # change is visible now instead of at the next reload.
+    command -v omarchy >/dev/null && omarchy restart shell >/dev/null 2>&1 || true
+    echo "tandem-config: appearance updated"
+    exit 0
+  fi
+
+  exec "$HERE/tandem-apply"
+  ;;
+
+*)
+  echo "usage: tandem-config [get | set <key> <value>]" >&2
+  exit 1
+  ;;
+esac
