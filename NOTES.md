@@ -366,5 +366,16 @@ duplicate entry appears. Verified over a full uninstall / install /
 `plugin remove` cycle — removal printed "Restored omarchy.workspaces." and the
 stock widget came back in its original slot.
 
-Removal still leaves Hyprland untouched, so the bindings persist until the
-next `hyprctl reload`.
+Removal still leaves Hyprland untouched, so the bindings persist in memory
+after the plugin directory is gone — `SUPER+2` keeps jumping to a Tandem
+desktop while the stock bindings stay unbound. `body.lua` repairs this: it
+checks whether its own generated file still exists on `workspace.active` and
+`window.open`, and runs `hyprctl reload` once when the file is gone. The
+loader is a `pcall`, so after that reload the file is simply not loaded.
+
+Hooked to events rather than `hl.timer` deliberately: no idle cost, and the
+repair fires exactly when the stale bindings are used.
+
+Testing note: `workspace.active` only fires on an actual change. Dispatching
+to the workspace already showing produces no event, which looked twice like
+the heal was broken when the test was.

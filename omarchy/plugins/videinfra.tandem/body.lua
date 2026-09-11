@@ -194,3 +194,30 @@ end
 -- Slide the whole desktop sideways instead of the default workspace fade.
 hl.curve("tandem", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.0 } } })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 10, bezier = "tandem", style = "slide" })
+
+-- Self-heal after `omarchy plugin remove`.
+--
+-- That command deletes the plugin directory but never touches Hyprland, so
+-- these bindings stay live in memory: SUPER+2 still jumps to a Tandem desktop
+-- and the stock per-monitor bindings stay unbound, until something reloads the
+-- config. Watch for our own generated file disappearing and reload once.
+--
+-- Hooked to workspace.active rather than a timer: it costs nothing while
+-- idle, and it fires exactly when the stale bindings are used, so the repair
+-- lands at the moment the breakage would be noticed. The loader line is a
+-- pcall, so after the reload this file is simply not loaded and the stock
+-- bindings come back.
+local SELF = (os.getenv("HOME") or "")
+  .. "/.config/omarchy/plugins/videinfra.tandem/tandem.lua"
+local healing = false
+
+local function heal_if_removed()
+  if healing then return end
+  local file = io.open(SELF, "r")
+  if file then file:close() return end
+  healing = true
+  hl.exec_cmd("hyprctl reload")
+end
+
+hl.on("workspace.active", heal_if_removed)
+hl.on("window.open", heal_if_removed)
