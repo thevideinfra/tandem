@@ -16,5 +16,8 @@
     "description": "Virtual desktops that move every monitor together",
     "category": "Compositor",
     "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.workspaces"
   }
 }

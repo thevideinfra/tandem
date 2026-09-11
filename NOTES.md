@@ -336,3 +336,35 @@ the restart down with it.
 Note the symptom shape: the disk write was always correct. Checking
 `shell.json` after a failed apply showed the right value, which points at the
 display when the fault is really in the process that refreshes it.
+
+## Superseding a built-in widget: `omarchy.clonedFrom`
+
+`omarchy-plugin-remove` restores the widget a plugin displaced only when the
+manifest names it:
+
+```json
+"omarchy": { "clonedFrom": "omarchy.workspaces" }
+```
+
+`PluginRegistry.restoreCloneSource()` then puts the source back in the same
+bar slot on removal. Without the field, removal deletes the entry and leaves
+the bar with no workspace indicator, recoverable only by hand (`plugin enable`
+drops it into the center section, so it also needs `omarchy bar move`).
+
+The field is meant for `omarchy plugin clone`, and Tandem shares no code with
+`omarchy.workspaces` — it is off-label. Measured, and nothing else it drives
+applies here:
+
+- `config.bar.id = clonedFrom` — only for `kinds: ["bar"]` whole-bar plugins.
+- `addDisabled(config, clonedFrom)` — only when the plugin has a non-widget
+  kind.
+- `stampHostCapabilities` — inherits the source's capabilities;
+  `omarchy.workspaces` has none.
+
+Install is unaffected: the layout swap in `install.sh` is still needed, and no
+duplicate entry appears. Verified over a full uninstall / install /
+`plugin remove` cycle — removal printed "Restored omarchy.workspaces." and the
+stock widget came back in its original slot.
+
+Removal still leaves Hyprland untouched, so the bindings persist until the
+next `hyprctl reload`.

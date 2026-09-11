@@ -141,26 +141,25 @@ screen at a time and desync the desktops.
 `./uninstall.sh` removes both plugins, restores `omarchy.workspaces` to the
 slot the widget occupied, and strips the loader line.
 
-`omarchy plugin remove videinfra.tandem` also works. It deletes the plugin
-directory, taking the generated `tandem.lua` with it, and keeps its own backup
-at `plugins/.videinfra.tandem.bak.<date>` (a dot-dir, which the registry
-ignores). Hyprland falls back to stock workspaces, including the bindings
-`tandem.lua` had unbound. The loader line survives but is a `pcall`, so
-`hyprctl configerrors` stays clean.
+`omarchy plugin remove videinfra.tandem` also restores `omarchy.workspaces`
+to the slot the widget occupied, because the manifest declares:
 
-Two caveats on that route:
+```json
+"omarchy": { "clonedFrom": "omarchy.workspaces" }
+```
 
-- It removes the bar entry instead of restoring `omarchy.workspaces`, leaving
-  no workspace indicator. `plugin enable` puts it back in the center, so
-  restoring takes two commands:
+`omarchy-plugin-remove` reads that field and hands the slot back to the named
+plugin. Tandem is not literally a clone of `omarchy.workspaces` — it shares no
+code — but it fills the same role in the bar, and this is the only mechanism
+Omarchy offers for a widget that supersedes a built-in one.
 
-  ```bash
-  omarchy plugin enable omarchy.workspaces
-  omarchy bar move omarchy.workspaces --section left
-  ```
+Two things `plugin remove` does not do:
 
-- `tandem-setup` lives in the plugin directory, so removal takes the wizard
-  too. Re-run `install.sh` to reconfigure.
+- It leaves `videinfra.tandem-settings` installed, and its panel calls
+  `tandem-config`, which is gone. Remove it too, or use `./uninstall.sh`.
+- It does not touch Hyprland, so the desktop bindings stay live until the next
+  `hyprctl reload`. The loader line is a `pcall`, so after that reload stock
+  workspaces return and `hyprctl configerrors` stays clean.
 
 Omarchy has **no plugin uninstall hook** — `omarchy-plugin-remove` is `rm -rf`
 plus a `shell.json` edit, and the manifest schema has no lifecycle fields. So
