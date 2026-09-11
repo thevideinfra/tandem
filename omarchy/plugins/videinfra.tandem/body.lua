@@ -11,7 +11,37 @@ local function current_desk()
   return math.floor((id - 1) / COUNT) + 1
 end
 
+-- Self-heal after `omarchy plugin remove`.
+--
+-- That command deletes the plugin directory but never touches Hyprland, so
+-- these bindings stay live in memory: SUPER+2 still jumps to a Tandem desktop
+-- and the stock per-monitor bindings stay unbound. Watch for our own
+-- generated file disappearing and reload once; the loader is a pcall, so
+-- after the reload this file is not loaded and the stock bindings return.
+--
+-- Checked inside show() rather than from an event. Every binding this config
+-- owns ends up here, so the repair fires on the first use of a stale one --
+-- which is exactly when the breakage is noticed. Hooking workspace.active
+-- instead does not work: show() moves monitors with set_workspace, which does
+-- not emit that event, so pressing a stale binding healed nothing.
+local SELF = (os.getenv("HOME") or "")
+  .. "/.config/omarchy/plugins/videinfra.tandem/tandem.lua"
+local healing = false
+
+local function heal_if_removed()
+  if healing then return false end
+  local file = io.open(SELF, "r")
+  if file then
+    file:close()
+    return false
+  end
+  healing = true
+  hl.exec_cmd("hyprctl reload")
+  return true
+end
+
 local function show(desk)
+  if heal_if_removed() then return end
   for index, name in ipairs(MONITORS) do
     local monitor = hl.get_monitor(name)
     if monitor then monitor:set_workspace({ workspace = tostring(workspace(desk, index)) }) end
@@ -194,30 +224,3 @@ end
 -- Slide the whole desktop sideways instead of the default workspace fade.
 hl.curve("tandem", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.0 } } })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 10, bezier = "tandem", style = "slide" })
-
--- Self-heal after `omarchy plugin remove`.
---
--- That command deletes the plugin directory but never touches Hyprland, so
--- these bindings stay live in memory: SUPER+2 still jumps to a Tandem desktop
--- and the stock per-monitor bindings stay unbound, until something reloads the
--- config. Watch for our own generated file disappearing and reload once.
---
--- Hooked to workspace.active rather than a timer: it costs nothing while
--- idle, and it fires exactly when the stale bindings are used, so the repair
--- lands at the moment the breakage would be noticed. The loader line is a
--- pcall, so after the reload this file is simply not loaded and the stock
--- bindings come back.
-local SELF = (os.getenv("HOME") or "")
-  .. "/.config/omarchy/plugins/videinfra.tandem/tandem.lua"
-local healing = false
-
-local function heal_if_removed()
-  if healing then return end
-  local file = io.open(SELF, "r")
-  if file then file:close() return end
-  healing = true
-  hl.exec_cmd("hyprctl reload")
-end
-
-hl.on("workspace.active", heal_if_removed)
-hl.on("window.open", heal_if_removed)
