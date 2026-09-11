@@ -122,9 +122,19 @@ set | set-json)
   # the regenerate-and-reload when nothing the compositor cares about changed.
   if [[ $(jq -r 'keys - ["labels", "separator"] | length' <<<"$patch") == 0 ]]; then
     # Labels and the separator live only in injected settings, which the bar
-    # refreshes just when it rebuilds the widget. Restart the shell so the
-    # change is visible now instead of at the next reload.
-    command -v omarchy >/dev/null && omarchy restart shell >/dev/null 2>&1 || true
+    # refreshes just when it rebuilds the widget, so the shell has to restart
+    # for the change to show.
+    #
+    # Detached, and after this script has exited. The settings panel runs this
+    # script as a child of the shell, so restarting the shell inline kills the
+    # whole process tree -- this script and the restart command with it. That
+    # race is why an applied name or separator used to flash and vanish, while
+    # the same change made alongside a desktop-count change stuck: that path
+    # reloads Hyprland instead and never restarts the shell.
+    if command -v omarchy >/dev/null; then
+      setsid sh -c 'sleep 0.5; omarchy restart shell' >/dev/null 2>&1 < /dev/null &
+      disown 2>/dev/null || true
+    fi
     echo "tandem-config: appearance updated"
     exit 0
   fi

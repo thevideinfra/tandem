@@ -310,3 +310,29 @@ Pinning (`float` + `pin` on press) also works — a pinned window rides every
 switch with no per-hop logic — but unpinning needs the same button-up nobody
 reports, and a missed unpin leaves the window on every desktop. Worse failure
 than a missed carry. Tried and reverted.
+
+## Never restart the shell from a process the shell spawned
+
+The settings panel runs `tandem-config` as a child of `omarchy-shell`. A
+cosmetic-only change has to restart the shell — labels and the separator live
+only in injected settings, which the bar refreshes when it rebuilds the widget
+— but doing it inline kills the whole process tree: the shell, `tandem-config`
+itself, and the `omarchy restart shell` command.
+
+The result is a race, not a clean failure. An applied name or separator would
+flash and vanish, or not apply at all, while the *same* change made alongside a
+desktop-count change stuck every time — that path reloads Hyprland instead and
+never restarts the shell.
+
+Detach it, and run it after this script has exited:
+
+```bash
+setsid sh -c 'sleep 0.5; omarchy restart shell' >/dev/null 2>&1 < /dev/null &
+```
+
+`setsid` moves it to a new session, so killing the shell's tree no longer takes
+the restart down with it.
+
+Note the symptom shape: the disk write was always correct. Checking
+`shell.json` after a failed apply showed the right value, which points at the
+display when the fault is really in the process that refreshes it.
