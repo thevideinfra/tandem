@@ -33,13 +33,15 @@ drifts between screens.
 ## Install
 
 ```bash
-./install.sh          # copies the plugins, swaps the bar widget, generates config
-./uninstall.sh        # removes everything, restores stock workspaces
+git clone https://github.com/thevideinfra/tandem.git
+cd tandem
+./install.sh
 ```
 
-`install.sh` works with no input: 2 desktops, autodetected monitors, `SUPER+F`.
-It then offers the setup wizard, but only when a terminal is attached, so
-piped installs stay non-interactive.
+`install.sh` copies both plugins into `~/.config/omarchy/plugins/`, swaps the
+bar widget, and generates the Hyprland config. It works with no input: 2
+desktops, autodetected monitors, `SUPER+F`. It then offers the setup wizard,
+but only when a terminal is attached, so piped installs stay non-interactive.
 
 Run the wizard later:
 
@@ -138,7 +140,11 @@ screen at a time and desync the desktops.
 
 ## Uninstalling
 
+The scripts are not installed onto the system — they stay in the clone, so run
+it from there:
+
 ```bash
+cd /path/to/tandem
 ./uninstall.sh
 ```
 
@@ -151,6 +157,15 @@ back — but it leaves things behind: `videinfra.tandem-settings` stays
 installed with a panel that can no longer reach `tandem-config`, and the
 loader line stays in `hyprland.lua` (inert, it is a `pcall`). Tandem reloads
 Hyprland itself on the next desktop switch so the stock bindings return.
+
+No clone to hand? Remove both plugins and delete the loader line:
+
+```bash
+omarchy plugin remove videinfra.tandem
+omarchy plugin remove videinfra.tandem-settings
+sed -i '/videinfra.tandem\/tandem.lua/d; /-- Virtual desktops (videinfra.tandem)/d' ~/.config/hypr/hyprland.lua
+hyprctl reload
+```
 
 ## Is this really all one plugin?
 
