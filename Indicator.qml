@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
@@ -63,13 +65,51 @@ BarWidget {
     return ids
   }
 
+  // A fresh `omarchy plugin add` puts this widget in the bar with no Hyprland
+  // config behind it. Offer the wizard rather than showing desktops that do
+  // not work yet; tandem-config reports whether setup has ever run.
+  property bool configured: true
+  readonly property string pluginDir:
+    Quickshell.env("HOME") + "/.config/omarchy/plugins/videinfra.tandem"
+
+  Process {
+    id: probe
+    running: true
+    command: [root.pluginDir + "/tandem-config", "get"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try { root.configured = JSON.parse(text).configured === true }
+        catch (e) { root.configured = true }
+      }
+    }
+  }
+
+  function runSetup() {
+    if (!root.bar) return
+    root.bar.run("omarchy-launch-tui " + root.pluginDir + "/tandem-setup")
+  }
+
   readonly property real trailingGap: root.vertical ? 0 : Style.spaceReal(1.5)
 
-  implicitWidth: grid.implicitWidth + trailingGap
-  implicitHeight: grid.implicitHeight
+  implicitWidth: root.configured ? grid.implicitWidth + trailingGap
+                                 : setupButton.implicitWidth
+  implicitHeight: root.configured ? grid.implicitHeight : setupButton.implicitHeight
+
+  WidgetButton {
+    id: setupButton
+    visible: !root.configured
+    bar: root.bar
+    text: "Set up Tandem"
+    horizontalMargin: 6
+    verticalPadding: 6
+    fixedHeight: root.barSize
+    onPressed: function() { root.runSetup() }
+  }
 
   GridLayout {
     id: grid
+    visible: root.configured
     anchors.fill: parent
     anchors.rightMargin: root.trailingGap
     columns: root.vertical ? 1 : root.deskCount

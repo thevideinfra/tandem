@@ -6,6 +6,7 @@
 # in QML.
 #
 #   tandem-config get                 print settings + detected monitors as JSON
+#                                     plus "configured": has setup ever run
 #   tandem-config set <key> <value>   update one key, then regenerate config
 #   tandem-config set-json <object>   update several keys in one go
 #
@@ -29,10 +30,14 @@ settings() {
 
 case "${1:-get}" in
 get)
+  # "Configured" means setup has produced a Hyprland config. A fresh
+  # `omarchy plugin add` leaves the widget in the bar with none, and the
+  # indicator offers to run the wizard instead of showing desktops.
+  if [[ -f $HERE/tandem.lua ]]; then configured=true; else configured=false; fi
   monitors=$(hyprctl monitors -j 2>/dev/null \
     | jq -c 'sort_by(.y, .x) | [.[] | {name, width, height, x, y}]' 2>/dev/null || echo '[]')
   # Fill defaults so the panel never has to know them.
-  settings | jq -c --argjson monitors "$monitors" '
+  settings | jq -c --argjson monitors "$monitors" --argjson configured "$configured" '
     {
       desktops: (if has("desktops") and .desktops != null then .desktops else 2 end),
       toggle:   (if has("toggle")   and .toggle   != null then .toggle   else "SUPER + F" end),
@@ -43,7 +48,8 @@ get)
       separator:(if has("separator") and .separator!= null then .separator else false end),
       monitors: (if has("monitors") and .monitors != null then .monitors else null end),
       labels:   (if has("labels")   and .labels   != null then .labels   else null end),
-      detected: $monitors
+      detected: $monitors,
+      configured: $configured
     }'
   ;;
 
