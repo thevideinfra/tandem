@@ -27,7 +27,7 @@ command -v jq >/dev/null || { echo "tandem-apply: jq is required" >&2; exit 1; }
 # ---- read settings (with defaults) ------------------------------------------
 settings='{}'
 if [[ -f $SHELL_JSON ]]; then
-  settings=$(jq -c '[.. | objects | select(.id == "videinfra.tandem") | (del(.id) | del(.settings)) + (.settings // {})] | first // {}' "$SHELL_JSON" 2>/dev/null || echo '{}')
+  settings=$(jq -c '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings") | (del(.id) | del(.settings)) + (.settings // {})] | first // {}' "$SHELL_JSON" 2>/dev/null || echo '{}')
   [[ -n $settings && $settings != "null" ]] || settings='{}'
 fi
 

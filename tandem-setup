@@ -16,7 +16,7 @@ done
 [[ -f $SHELL_JSON ]] || { echo "tandem-setup: $SHELL_JSON not found" >&2; exit 1; }
 
 current() { jq -r --arg k "$1" --arg d "$2" \
-  '[.. | objects | select(.id == "videinfra.tandem")
+  '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings")
      | (del(.id) | del(.settings)) + (.settings // {})] | first // {}
    | if has($k) and .[$k] != null then .[$k] else $d end' "$SHELL_JSON"; }
 
@@ -95,7 +95,7 @@ echo "  separator:        $separator"
 echo
 
 # --- desktop names ----------------------------------------------------------
-existing_labels=$(jq -c '[.. | objects | select(.id == "videinfra.tandem") | (del(.id) | del(.settings)) + (.settings // {})] | first // {} | .labels // null' "$SHELL_JSON")
+existing_labels=$(jq -c '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings") | (del(.id) | del(.settings)) + (.settings // {})] | first // {} | .labels // null' "$SHELL_JSON")
 default_label() { printf 'D%s' "$1"; }
 
 echo
@@ -130,9 +130,9 @@ settings=$(jq -nc \
 cp "$SHELL_JSON" "$SHELL_JSON.bak.$(date +%s)"
 tmp=$(mktemp)
 jq --argjson s "$settings" \
-  '(.. | objects | select(.id == "videinfra.tandem")) |= ({id} + $s)' \
+  '(.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings")) |= ({id} + (if has("role") then {role} else {} end) + $s)' \
   "$SHELL_JSON" >"$tmp"
-jq -e '[.. | objects | select(.id == "videinfra.tandem")] | length > 0' "$tmp" >/dev/null \
+jq -e '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings")] | length > 0' "$tmp" >/dev/null \
   || { echo "tandem-setup: widget not found in shell.json -- add it to the bar first" >&2
        rm -f "$tmp"; exit 1; }
 mv "$tmp" "$SHELL_JSON"

@@ -13,8 +13,8 @@ import qs.Ui
 // to do on every click while someone is still deciding.
 Panel {
   id: root
-  moduleName: "videinfra.tandem-settings"
-  ipcTarget: "videinfra.tandem-settings"
+  moduleName: "videinfra.tandem"
+  ipcTarget: "videinfra.tandem"
 
   readonly property string pluginDir:
     Quickshell.env("HOME") + "/.config/omarchy/plugins/videinfra.tandem"
