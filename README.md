@@ -12,6 +12,12 @@ Built with Claude Code.
 
 I like the way KDE handled this with virtual desktops as opposed to independent workspaces. I typically only have 2 "workspaces" that I swap back and forth between with SUPER + F and I wanted this ability in Omarchy.
 
+![Both monitors switching desktop together](assets/switch.gif)
+
+*One keypress; both monitors move together.*
+
+![Tandem bar indicator](assets/bar-indicator.png)
+
 ## Model
 
 A desktop owns one workspace per monitor:
@@ -56,6 +62,8 @@ Re-run the wizard any time:
 
 It asks for monitor order, desktop count, names and keys, writes them to
 `shell.json`, and regenerates the Hyprland config.
+
+![Settings panel](assets/settings-panel.png)
 
 The **settings panel** (grid icon, right of the bar) edits desktop count,
 names, keybindings and the `|` separator, and lists the detected monitors.
