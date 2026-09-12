@@ -153,30 +153,33 @@ screen at a time and desync the desktops.
 
 ## Uninstalling
 
-The scripts are not installed onto the system — they stay in the clone, so run
-it from there:
-
 ```bash
-cd /path/to/tandem
+cd ~/.config/omarchy/plugins/videinfra.tandem
 ./uninstall.sh
 ```
 
-Removes the plugin and both its bar entries, restores `omarchy.workspaces` to
-the slot the indicator occupied, and strips the loader line from `hyprland.lua`.
+Does everything: restores `omarchy.workspaces` to the slot the indicator
+occupied, removes the settings entry, strips the loader line from
+`hyprland.lua`, deletes the plugin, and reloads. `omarchy plugin remove` is
+not needed — `uninstall.sh` deletes the plugin directory itself.
 
-`omarchy plugin remove videinfra.tandem` works too — the manifest declares
-`"omarchy": { "clonedFrom": "omarchy.workspaces" }`, so the stock widget comes
-back — but the loader line stays in `hyprland.lua` (inert, it is a `pcall`).
-Tandem reloads Hyprland itself on the next desktop switch so the stock
-bindings return.
+Run it **before** `omarchy plugin remove`, not after: that command deletes the
+plugin directory, and `uninstall.sh` lives inside it.
 
-No clone to hand? Remove the plugin and delete the loader line:
+If the plugin is already gone, or you prefer the Omarchy command:
 
 ```bash
 omarchy plugin remove videinfra.tandem
 sed -i '/videinfra.tandem\/tandem.lua/d; /-- Virtual desktops (videinfra.tandem)/d' ~/.config/hypr/hyprland.lua
 hyprctl reload
 ```
+
+`plugin remove` restores `omarchy.workspaces` on its own, because the manifest
+declares `"omarchy": { "clonedFrom": "omarchy.workspaces" }`. It leaves the
+loader line behind, which the `sed` removes — harmless either way, since the
+line is a `pcall` and does nothing once the file is gone. Tandem also reloads
+Hyprland itself on the next desktop switch, so the stock bindings return even
+without the `hyprctl reload`.
 
 ## Is this really all one plugin?
 

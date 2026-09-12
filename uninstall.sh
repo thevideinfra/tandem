@@ -14,10 +14,7 @@ HYPRLAND_LUA="$HOME/.config/hypr/hyprland.lua"
 SHELL_JSON="$OMARCHY/shell.json"
 STAMP="$(date +%s)"
 
-echo "1. plugin directories"
-if [[ -d $PLUGIN ]]; then rm -rf "$PLUGIN"; echo "  removed videinfra.tandem"; fi
-
-echo "2. bar layout"
+echo "1. bar layout"
 # Drop the settings widget from wherever it ended up.
 if [[ -f $SHELL_JSON ]] && command -v jq >/dev/null \
   && jq -e '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") == "settings")] | length > 0' "$SHELL_JSON" >/dev/null; then
@@ -56,7 +53,7 @@ else
   echo "  bar had no workspace widget; added omarchy.workspaces to the left section"
 fi
 
-echo "3. loader line in hyprland.lua"
+echo "2. loader line in hyprland.lua"
 if [[ -f $HYPRLAND_LUA ]] && grep -qF 'videinfra.tandem/tandem.lua' "$HYPRLAND_LUA"; then
   cp "$HYPRLAND_LUA" "$HYPRLAND_LUA.bak.$STAMP"
   # Drop the loader and its comment. Both patterns go through -e: the comment
@@ -72,6 +69,12 @@ if [[ -f $HYPRLAND_LUA ]] && grep -qF 'videinfra.tandem/tandem.lua' "$HYPRLAND_L
 else
   echo "  not present"
 fi
+
+echo "3. plugin directory"
+# Last: this script usually lives inside the directory it is deleting, so let
+# every other step finish first rather than relying on bash having buffered
+# the whole file.
+if [[ -d $PLUGIN ]]; then rm -rf "$PLUGIN"; echo "  removed videinfra.tandem"; fi
 
 if command -v hyprctl >/dev/null && [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
   hyprctl reload >/dev/null
