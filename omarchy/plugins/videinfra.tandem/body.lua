@@ -11,19 +11,12 @@ local function current_desk()
   return math.floor((id - 1) / COUNT) + 1
 end
 
--- Self-heal after `omarchy plugin remove`.
---
--- That command deletes the plugin directory but never touches Hyprland, so
--- these bindings stay live in memory: SUPER+2 still jumps to a Tandem desktop
--- and the stock per-monitor bindings stay unbound. Watch for our own
--- generated file disappearing and reload once; the loader is a pcall, so
--- after the reload this file is not loaded and the stock bindings return.
---
--- Checked inside show() rather than from an event. Every binding this config
--- owns ends up here, so the repair fires on the first use of a stale one --
--- which is exactly when the breakage is noticed. Hooking workspace.active
--- instead does not work: show() moves monitors with set_workspace, which does
--- not emit that event, so pressing a stale binding healed nothing.
+-- Self-heal after `omarchy plugin remove`: it deletes the plugin but never
+-- touches Hyprland, so these bindings stay live in memory. Reload once when
+-- the generated file is gone; the loader is a pcall, so the stock bindings
+-- return. Checked here, not on workspace.active -- show() moves monitors with
+-- set_workspace, which does not emit that event, and every binding reaches
+-- show(), so the repair fires on first use of a stale one.
 local SELF = (os.getenv("HOME") or "")
   .. "/.config/omarchy/plugins/videinfra.tandem/tandem.lua"
 local healing = false
@@ -107,35 +100,22 @@ end
 
 -- Drag-carry: SUPER+drag a window, then switch desktop to bring it along.
 --
--- Two mechanisms, because the compositor treats the two switch paths
--- differently:
+-- SUPER+scroll is a mouse bind: the pointer grab stays alive and Hyprland
+-- carries the window itself, any number of desktops. That path stays a plain
+-- show() -- moving the window there too would end the drag. Keyboard switches
+-- drop the grab and must move it explicitly, via go().
 --
---   * SUPER+scroll is a mouse bind, so Hyprland's pointer grab stays alive and
---     the compositor carries the dragged window itself, across any number of
---     desktops, until the button comes up. That path must stay a plain show():
---     moving the window here as well would double-handle it and end the drag.
---   * SUPER+F, SUPER+1..n and SUPER+TAB are keyboard binds. They drop the
---     grab, so the window has to be moved explicitly -- see go().
+-- Nothing reports the button coming up: no release event fires after a real
+-- drag, and is_key_down cannot see mouse buttons. Four rules keep a stale
+-- record from carrying a window nobody holds -- the record is an address,
+-- re-resolved on use; the window must still be focused; focus landing
+-- elsewhere clears it; the pointer must still be over it.
 --
--- Keyboard carrying needs to know which window is held, and nothing reports
--- that the button came up. Measured, not assumed: no release event arrives
--- after a real drag (neither { mouse, release } nor a plain { release } bind
--- fires), and is_key_down cannot see mouse buttons (272, 0x110, 1, 2, 3 and
--- 0x120 all read false against a physically held button). Four rules keep a
--- stale record from carrying a window nobody is dragging:
---
---   * the record is a window address, re-resolved on every use, so a window
---     that has since closed simply resolves to nothing;
---   * the window must still be focused;
---   * focus landing on any other window clears it;
---   * the pointer must still be over the window.
---
--- Do NOT re-attach the drag with hl.dsp.window.drag() to keep the window glued
--- to the pointer: that stops Hyprland issuing the press that re-arms the
--- record, and one press then produces unbounded carries. Pinning the window
--- instead (float + pin) does make it ride every switch, but unpinning needs
--- the same button-up nobody reports, and a missed unpin leaves the window on
--- every desktop -- worse than a missed carry. Both were tried and reverted.
+-- Do NOT re-attach with hl.dsp.window.drag() to keep the window glued to the
+-- pointer: it suppresses the press that re-arms the record, giving unbounded
+-- carries. Pinning (float + pin) rides every switch but needs the same
+-- missing button-up to unpin, stranding the window on every desktop. See
+-- NOTES.md.
 local drag = nil
 
 local function axis(value, key, index)
@@ -180,12 +160,10 @@ hl.on("window.active", function()
   if window and window.address ~= drag then drag = nil end
 end)
 
--- Switch desktop, carrying a grabbed window with it. Keyboard paths only; see
--- the drag-carry notes above for why scroll must not come through here.
---
--- The record is consumed: with no button-up to clear it, a record that
--- survived would carry the window again on the next switch. Cost is one
--- desktop per grab -- grab again, or use SUPER+scroll, to go further.
+-- Switch desktop, carrying a grabbed window. Keyboard paths only; scroll must
+-- not come through here. The record is consumed -- with no button-up to clear
+-- it, a surviving record would carry the window again on the next switch. One
+-- desktop per grab; use SUPER+scroll to go further.
 local function go(desk)
   local window = drag_target()
   if not window then return show(desk) end
