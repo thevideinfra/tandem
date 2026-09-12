@@ -138,35 +138,19 @@ screen at a time and desync the desktops.
 
 ## Uninstalling
 
-`./uninstall.sh` removes both plugins, restores `omarchy.workspaces` to the
-slot the widget occupied, and strips the loader line.
-
-`omarchy plugin remove videinfra.tandem` also restores `omarchy.workspaces`
-to the slot the widget occupied, because the manifest declares:
-
-```json
-"omarchy": { "clonedFrom": "omarchy.workspaces" }
+```bash
+./uninstall.sh
 ```
 
-`omarchy-plugin-remove` reads that field and hands the slot back to the named
-plugin. Tandem is not literally a clone of `omarchy.workspaces` — it shares no
-code — but it fills the same role in the bar, and this is the only mechanism
-Omarchy offers for a widget that supersedes a built-in one.
+Removes both plugins, restores `omarchy.workspaces` to the slot the widget
+occupied, and strips the loader line from `hyprland.lua`.
 
-Two things `plugin remove` does not do:
-
-- It leaves `videinfra.tandem-settings` installed, and its panel calls
-  `tandem-config`, which is gone. Remove it too, or use `./uninstall.sh`.
-- It does not touch Hyprland, so the desktop bindings stay live in memory:
-  `SUPER+2` still jumps to a Tandem desktop and the stock per-monitor
-  bindings stay unbound. Tandem repairs this itself — it watches for its own
-  generated file disappearing and reloads once, on the next desktop switch or
-  new window. Run `hyprctl reload` to force it immediately.
-
-Omarchy has **no plugin uninstall hook** — `omarchy-plugin-remove` is `rm -rf`
-plus a `shell.json` edit, and the manifest schema has no lifecycle fields. So
-the config is written to be inert on removal rather than relying on cleanup
-that might never run.
+`omarchy plugin remove videinfra.tandem` works too — the manifest declares
+`"omarchy": { "clonedFrom": "omarchy.workspaces" }`, so the stock widget comes
+back — but it leaves things behind: `videinfra.tandem-settings` stays
+installed with a panel that can no longer reach `tandem-config`, and the
+loader line stays in `hyprland.lua` (inert, it is a `pcall`). Tandem reloads
+Hyprland itself on the next desktop switch so the stock bindings return.
 
 ## Is this really all one plugin?
 
