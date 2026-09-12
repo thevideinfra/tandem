@@ -12,10 +12,6 @@ Built with Claude Code.
 
 I like the way KDE handled this with virtual desktops as opposed to independent workspaces. I typically only have 2 "workspaces" that I swap back and forth between with SUPER + F and I wanted this ability in Omarchy.
 
-![Both monitors switching desktop together](assets/switch.gif)
-
-*One keypress; both monitors move together.*
-
 ![Tandem bar indicator](assets/bar-indicator.png)
 
 ## Model
