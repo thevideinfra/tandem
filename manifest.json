@@ -4,6 +4,7 @@
   "name": "Tandem",
   "version": "2.0.0",
   "author": "videinfra",
+  "license": "MIT",
   "description": "Virtual desktops that move every monitor together",
   "kinds": [
     "bar-widget"

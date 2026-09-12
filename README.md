@@ -34,20 +34,21 @@ drifts between screens.
 
 ```bash
 omarchy plugin add https://github.com/thevideinfra/tandem.git --enable
-~/.config/omarchy/plugins/videinfra.tandem/install.sh
 ```
 
-`plugin add` installs the widget. `install.sh` puts it in the bar, generates
-the Hyprland config and adds the loader line — none of which any Omarchy
-command does, since plugins have no hook for compositor config.
+The widget appears in the bar reading **Set up Tandem**. Click it: a terminal
+opens with the setup wizard, which asks for monitor order, desktop count,
+names and each keybinding. Nothing touches Hyprland until you answer it.
 
-Cloning by hand and running `./install.sh` from the clone works the same way.
+On finishing, the wizard writes your answers, generates the Hyprland config,
+adds the settings widget to the right of the bar, and the indicator becomes
+`D1 D2`.
 
-It needs no input: 2 desktops, autodetected monitors, `SUPER+F`. It then
-offers the setup wizard, but only when a terminal is attached, so piped
-installs stay non-interactive.
+Cloning the repo and running `./install.sh` does the same thing
+non-interactively, with defaults — 2 desktops, autodetected monitors,
+`SUPER+F` — and is the scripted path.
 
-Run the wizard later:
+Re-run the wizard any time:
 
 ```bash
 ~/.config/omarchy/plugins/videinfra.tandem/tandem-setup

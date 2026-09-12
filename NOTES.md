@@ -84,6 +84,14 @@ button or the bar slot collapses to zero width and the widget never appears.
 does not cover a plugin newly added to the layout, nor some edits to a loaded
 panel.
 
+**First run has no Hyprland config.** `omarchy plugin add --enable` clones the
+plugin and places one bar entry; it runs nothing, so no generated config
+exists yet. The widget detects that (`tandem-config get` reports
+`configured`), shows a button that launches the wizard in a terminal, and the
+wizard writes the config and adds the second bar entry. Precedent:
+`crmne.hyprmoncfg` ships the same shape, including editing Hyprland config
+from the script its button runs.
+
 **An install script must tolerate running from the installed plugin.** The
 `omarchy plugin add` flow leaves the repo at
 `~/.config/omarchy/plugins/<id>/`, so a script run from there has source and

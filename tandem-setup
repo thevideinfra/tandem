@@ -139,4 +139,17 @@ mv "$tmp" "$SHELL_JSON"
 echo "Saved settings to $SHELL_JSON (backed up first)."
 echo
 
+# `omarchy plugin add --enable` creates a single bar entry. The settings panel
+# is a second entry of the same id, so add it the first time setup runs.
+if ! jq -e '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") == "settings")] | length > 0' \
+  "$SHELL_JSON" >/dev/null; then
+  tmp=$(mktemp)
+  jq '.bar.layout.right = ([{"id": "videinfra.tandem", "role": "settings"}] + (.bar.layout.right // []))' \
+    "$SHELL_JSON" >"$tmp"
+  mv "$tmp" "$SHELL_JSON"
+  echo "Added the settings widget to the right of the bar."
+  command -v omarchy >/dev/null &&
+    setsid sh -c 'sleep 0.5; omarchy restart shell' >/dev/null 2>&1 < /dev/null &
+fi
+
 exec "$HERE/tandem-apply"
