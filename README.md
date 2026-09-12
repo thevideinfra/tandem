@@ -33,10 +33,13 @@ drifts between screens.
 ## Install
 
 ```bash
-git clone https://github.com/thevideinfra/tandem.git
-cd tandem
-./install.sh
+omarchy plugin add https://github.com/thevideinfra/tandem.git --enable
+~/.config/omarchy/plugins/videinfra.tandem/install.sh
 ```
+
+`plugin add` clones the widget; `install.sh` generates the Hyprland config and
+adds the loader line, which no Omarchy command can do. Cloning by hand and
+running `./install.sh` from the clone works identically.
 
 `install.sh` copies both plugins into `~/.config/omarchy/plugins/`, swaps the
 bar widget, and generates the Hyprland config. It works with no input: 2
@@ -60,19 +63,27 @@ staged edits; so does closing the panel.
 
 ## Layout
 
-```
-omarchy/plugins/videinfra.tandem/
-  manifest.json     bar-widget plugin
-  BarWidget.qml     the D1/D2 indicator
-  body.lua          the logic, hand-maintained
-  tandem-apply      generates tandem.lua from settings, installs the loader
-  tandem-setup      gum wizard; writes settings, then calls tandem-apply
-  tandem-config     get / set / set-json; the panel's back end
-  tandem.lua        GENERATED -- not in git
+The repo root is the plugin, as `omarchy plugin add` requires.
 
-omarchy/plugins/videinfra.tandem-settings/
-  manifest.json     settings widget, bar's right section
-  Panel.qml         settings panel; thin front-end over tandem-config
+```
+manifest.json     bar-widget plugin, allowMultiple
+BarWidget.qml     entry point; picks a role from its bar entry
+Indicator.qml     the D1/D2 indicator
+Settings.qml      the settings panel
+body.lua          the logic, hand-maintained
+tandem-apply      generates tandem.lua from settings, installs the loader
+tandem-setup      gum wizard; writes settings, then calls tandem-apply
+tandem-config     get / set / set-json; the panel's back end
+tandem.lua        GENERATED -- not in git
+```
+
+Both widgets are one plugin with two bar entries. A manifest declares a single
+`barWidget` entry point, so `BarWidget.qml` loads `Indicator.qml` or
+`Settings.qml` depending on `role`:
+
+```json
+left:  { "id": "videinfra.tandem", "desktops": 2 }
+right: { "id": "videinfra.tandem", "role": "settings" }
 ```
 
 ## Settings
@@ -153,10 +164,9 @@ occupied, and strips the loader line from `hyprland.lua`.
 
 `omarchy plugin remove videinfra.tandem` works too — the manifest declares
 `"omarchy": { "clonedFrom": "omarchy.workspaces" }`, so the stock widget comes
-back — but it leaves things behind: `videinfra.tandem-settings` stays
-installed with a panel that can no longer reach `tandem-config`, and the
-loader line stays in `hyprland.lua` (inert, it is a `pcall`). Tandem reloads
-Hyprland itself on the next desktop switch so the stock bindings return.
+back — but the loader line stays in `hyprland.lua` (inert, it is a `pcall`).
+Tandem reloads Hyprland itself on the next desktop switch so the stock
+bindings return.
 
 No clone to hand? Remove both plugins and delete the loader line:
 
@@ -169,7 +179,7 @@ hyprctl reload
 
 ## Is this really all one plugin?
 
-Two plugins, and neither can declare Hyprland config. Omarchy manifests only
+One plugin, two bar entries — but it cannot declare Hyprland config. Omarchy manifests only
 accept Quickshell kinds, so there is no *declarative* hook — but plugin QML is
 not sandboxed (`authentication` is the registry's only gated capability), so
 Tandem does it imperatively: the widget shells out, the wizard writes

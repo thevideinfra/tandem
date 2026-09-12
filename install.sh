@@ -6,7 +6,6 @@ set -euo pipefail
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OMARCHY="$HOME/.config/omarchy"
 PLUGIN="$OMARCHY/plugins/videinfra.tandem"
-SETTINGS_PLUGIN="$OMARCHY/plugins/videinfra.tandem-settings"
 STAMP="$(date +%s)"
 
 for tool in jq hyprctl; do
@@ -22,14 +21,13 @@ if [[ -d $PLUGIN ]]; then
   cp -r "$PLUGIN" "$OMARCHY/.tandem-backups/videinfra.tandem.bak.$STAMP"
   echo "  backed up -> ~/.config/omarchy/.tandem-backups/videinfra.tandem.bak.$STAMP"
 fi
-if [[ -d $SETTINGS_PLUGIN ]]; then
-  mkdir -p "$OMARCHY/.tandem-backups"
-  cp -r "$SETTINGS_PLUGIN" "$OMARCHY/.tandem-backups/videinfra.tandem-settings.bak.$STAMP"
-fi
-mkdir -p "$OMARCHY/plugins"
-rm -rf "$PLUGIN" "$SETTINGS_PLUGIN"
-cp -r "$SRC/omarchy/plugins/videinfra.tandem" "$PLUGIN"
-cp -r "$SRC/omarchy/plugins/videinfra.tandem-settings" "$SETTINGS_PLUGIN"
+mkdir -p "$PLUGIN"
+rm -rf "$PLUGIN"
+mkdir -p "$PLUGIN"
+for f in manifest.json BarWidget.qml Indicator.qml Settings.qml body.lua \
+         tandem-apply tandem-config tandem-setup; do
+  cp "$SRC/$f" "$PLUGIN/$f"
+done
 chmod +x "$PLUGIN/tandem-apply" "$PLUGIN/tandem-setup" "$PLUGIN/tandem-config"
 
 echo "2. bar layout"
@@ -66,14 +64,15 @@ if [[ -f $SHELL_JSON ]] \
 fi
 
 echo "3. settings widget"
+# Same plugin id, second bar entry. The manifest sets allowMultiple, and
+# BarWidget.qml picks its role from the entry.
 if [[ -f $SHELL_JSON ]] \
-  && jq -e '[.. | objects | select(.id == "videinfra.tandem-settings")] | length > 0' "$SHELL_JSON" >/dev/null; then
+  && jq -e '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") == "settings")] | length > 0' "$SHELL_JSON" >/dev/null; then
   echo "  already in the bar"
 elif [[ -f $SHELL_JSON ]]; then
   cp "$SHELL_JSON" "$SHELL_JSON.bak.$STAMP.settings"
   tmp=$(mktemp)
-  # Leading position in the right section, so it sits before audio/network/power.
-  jq '.bar.layout.right = ([{"id": "videinfra.tandem-settings"}] + (.bar.layout.right // []))' \
+  jq '.bar.layout.right = ([{"id": "videinfra.tandem", "role": "settings"}] + (.bar.layout.right // []))' \
     "$SHELL_JSON" >"$tmp"
   mv "$tmp" "$SHELL_JSON"
   echo "  added to the right section"

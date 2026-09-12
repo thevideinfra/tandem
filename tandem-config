@@ -24,7 +24,7 @@ settings() {
   # Bar entries carry widget settings as flat keys (BarModel.entrySettings
   # copies every key but id), so that is where these live. Any older nested
   # "settings" object is merged up and dropped on the next write.
-  jq -c '[.. | objects | select(.id == "videinfra.tandem") | (del(.id) | del(.settings)) + (.settings // {})] | first // {}' "$SHELL_JSON"
+  jq -c '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings") | (del(.id) | del(.settings)) + (.settings // {})] | first // {}' "$SHELL_JSON"
 }
 
 case "${1:-get}" in
@@ -107,13 +107,13 @@ set | set-json)
     done < <(jq -r 'keys[]' <<<"$raw")
   fi
 
-  jq -e '[.. | objects | select(.id == "videinfra.tandem")] | length > 0' "$SHELL_JSON" >/dev/null \
+  jq -e '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings")] | length > 0' "$SHELL_JSON" >/dev/null \
     || { echo "tandem-config: widget not in shell.json -- add it to the bar first" >&2; exit 1; }
 
   cp "$SHELL_JSON" "$SHELL_JSON.bak.$(date +%s)"
   tmp=$(mktemp)
   jq --argjson patch "$patch" \
-    '(.. | objects | select(.id == "videinfra.tandem")) |=
+    '(.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings")) |=
        ((del(.settings)) + (.settings // {}) + $patch)' \
     "$SHELL_JSON" >"$tmp"
   mv "$tmp" "$SHELL_JSON"

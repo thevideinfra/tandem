@@ -15,7 +15,8 @@
     "displayName": "Tandem",
     "description": "Virtual desktops that move every monitor together",
     "category": "Compositor",
-    "allowMultiple": false
+    "allowMultiple": true,
+    "defaultSection": "left"
   },
   "omarchy": {
     "clonedFrom": "omarchy.workspaces"

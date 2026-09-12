@@ -15,19 +15,17 @@ SHELL_JSON="$OMARCHY/shell.json"
 STAMP="$(date +%s)"
 
 echo "1. plugin directories"
-for dir in "$PLUGIN" "$OMARCHY/plugins/videinfra.tandem-settings"; do
-  if [[ -d $dir ]]; then rm -rf "$dir"; echo "  removed $(basename "$dir")"; fi
-done
+if [[ -d $PLUGIN ]]; then rm -rf "$PLUGIN"; echo "  removed videinfra.tandem"; fi
 
 echo "2. bar layout"
 # Drop the settings widget from wherever it ended up.
 if [[ -f $SHELL_JSON ]] && command -v jq >/dev/null \
-  && jq -e '[.. | objects | select(.id == "videinfra.tandem-settings")] | length > 0' "$SHELL_JSON" >/dev/null; then
+  && jq -e '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") == "settings")] | length > 0' "$SHELL_JSON" >/dev/null; then
   cp "$SHELL_JSON" "$SHELL_JSON.bak.$STAMP.settings"
   tmp=$(mktemp)
   jq '.bar.layout |= with_entries(
         if (.value | type) == "array"
-        then .value |= map(select(.id != "videinfra.tandem-settings"))
+        then .value |= map(select((.id != "videinfra.tandem") or ((.role // "") != "settings")))
         else . end)' "$SHELL_JSON" >"$tmp"
   mv "$tmp" "$SHELL_JSON"
   echo "  removed the settings widget"
@@ -35,13 +33,13 @@ if [[ -f $SHELL_JSON ]] && command -v jq >/dev/null \
 fi
 if [[ ! -f $SHELL_JSON ]] || ! command -v jq >/dev/null; then
   echo "  no shell.json to fix up"
-elif jq -e '[.. | objects | select(.id == "videinfra.tandem")] | length > 0' "$SHELL_JSON" >/dev/null; then
+elif jq -e '[.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings")] | length > 0' "$SHELL_JSON" >/dev/null; then
   # Rename in place so the widget keeps its position in the bar.
   cp "$SHELL_JSON" "$SHELL_JSON.bak.$STAMP"
   tmp=$(mktemp)
   # Keep only the id: Tandem's settings are flat keys on the entry, and
   # leaving them behind would resurrect old values on the next install.
-  jq '(.. | objects | select(.id == "videinfra.tandem")) |= {id: "omarchy.workspaces"}' \
+  jq '(.. | objects | select(.id == "videinfra.tandem" and (.role // "") != "settings")) |= {id: "omarchy.workspaces"}' \
     "$SHELL_JSON" >"$tmp"
   mv "$tmp" "$SHELL_JSON"
   echo "  restored omarchy.workspaces in place (backed up first)"

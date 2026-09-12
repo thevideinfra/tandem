@@ -84,6 +84,14 @@ button or the bar slot collapses to zero width and the widget never appears.
 does not cover a plugin newly added to the layout, nor some edits to a loaded
 panel.
 
+**One plugin can supply two bar widgets.** A manifest declares a single
+`barWidget` entry point, but `allowMultiple: true` lets the same id appear
+twice in `shell.json`, and each entry's own keys reach the widget as
+`settings`. A switch component loading one of two files by `settings.role`
+keeps the repo to one `manifest.json` at its root, which `omarchy plugin add`
+requires. Only the settings role instantiates `Panel`, so the two entries do
+not collide over `ipcTarget`.
+
 **Never restart the shell from a process the shell spawned.** The settings
 panel runs `tandem-config` as a child of `omarchy-shell`, so an inline
 `omarchy restart shell` kills the whole tree, including the script and the
@@ -144,9 +152,9 @@ done
 ## Validating a change
 
 ```bash
-bash -n omarchy/plugins/videinfra.tandem/tandem-{apply,setup,config} install.sh uninstall.sh
-omarchy plugin validate omarchy/plugins/videinfra.tandem
-qmllint omarchy/plugins/videinfra.tandem/BarWidget.qml   # qs.* import warnings are noise
+bash -n tandem-{apply,setup,config} install.sh uninstall.sh
+omarchy plugin validate .
+qmllint BarWidget.qml Indicator.qml Settings.qml   # qs.* import warnings are noise
 HOME=/tmp/sandbox ./install.sh && HOME=/tmp/sandbox ./uninstall.sh
 ```
 
