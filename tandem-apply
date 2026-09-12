@@ -132,4 +132,34 @@ if command -v hyprctl >/dev/null && [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; t
     exit 1
   fi
   echo "tandem-apply: reloaded, config clean"
+
+  # Lowering the desktop count strands every window above the new last
+  # workspace. Those workspaces keep existing because they hold windows, the
+  # bar infers the desktop count from the highest live workspace, and the old
+  # count stays on screen -- so the change looks like it did not take. They
+  # also survive an uninstall. Move the windows down to the last desktop on
+  # the monitor they are already on.
+  monitor_count=$(wc -w <<<"${lua_list//,/ }")
+  monitor_count=$(( monitor_count > 0 ? monitor_count : 1 ))
+  last=$(( DESKTOPS * monitor_count ))
+  moved=0
+  while read -r address workspace; do
+    [[ -n $address && $workspace =~ ^[0-9]+$ ]] || continue
+    (( workspace > last )) || continue
+    index=$(( (workspace - 1) % monitor_count + 1 ))
+    target=$(( (DESKTOPS - 1) * monitor_count + index ))
+    hyprctl dispatch "hl.dsp.window.move({ window = \"address:$address\", workspace = \"$target\", follow = false })" >/dev/null 2>&1
+    moved=$(( moved + 1 ))
+  done < <(hyprctl clients -j 2>/dev/null | jq -r '.[] | "\(.address) \(.workspace.id)"')
+  (( moved > 0 )) && echo "tandem-apply: moved $moved window(s) off retired desktops"
+
+  # Hyprland only reaps a now-ruleless empty workspace when the monitor leaves
+  # it, so without this the retired workspaces linger, the bar keeps inferring
+  # the old desktop count from the highest live workspace, and the change looks
+  # like it never applied. Switching once clears them.
+  current=$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // 1')
+  [[ $current =~ ^[0-9]+$ ]] || current=1
+  desk=$(( (current - 1) / monitor_count + 1 ))
+  (( desk >= 1 && desk <= DESKTOPS )) || desk=1
+  hyprctl dispatch "tandem_show($desk)" >/dev/null 2>&1
 fi
