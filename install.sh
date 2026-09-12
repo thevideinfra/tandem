@@ -16,18 +16,24 @@ done
 echo "1. plugin files"
 # Backups go outside plugins/, or the shell scans them as a second plugin
 # declaring the same id.
-if [[ -d $PLUGIN ]]; then
+if [[ -d $PLUGIN && $SRC != "$PLUGIN" ]]; then
   mkdir -p "$OMARCHY/.tandem-backups"
   cp -r "$PLUGIN" "$OMARCHY/.tandem-backups/videinfra.tandem.bak.$STAMP"
   echo "  backed up -> ~/.config/omarchy/.tandem-backups/videinfra.tandem.bak.$STAMP"
 fi
-mkdir -p "$PLUGIN"
-rm -rf "$PLUGIN"
-mkdir -p "$PLUGIN"
-for f in manifest.json BarWidget.qml Indicator.qml Settings.qml body.lua \
-         tandem-apply tandem-config tandem-setup; do
-  cp "$SRC/$f" "$PLUGIN/$f"
-done
+# Running from inside the installed plugin -- the `omarchy plugin add` path --
+# means the source and the destination are the same directory, so there is
+# nothing to copy and wiping the destination would delete this script.
+if [[ $SRC == "$PLUGIN" ]]; then
+  echo "  already in place (running from the installed plugin)"
+else
+  rm -rf "$PLUGIN"
+  mkdir -p "$PLUGIN"
+  for f in manifest.json BarWidget.qml Indicator.qml Settings.qml body.lua \
+           tandem-apply tandem-config tandem-setup; do
+    cp "$SRC/$f" "$PLUGIN/$f"
+  done
+fi
 chmod +x "$PLUGIN/tandem-apply" "$PLUGIN/tandem-setup" "$PLUGIN/tandem-config"
 
 echo "2. bar layout"

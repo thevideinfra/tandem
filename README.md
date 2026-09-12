@@ -37,14 +37,15 @@ omarchy plugin add https://github.com/thevideinfra/tandem.git --enable
 ~/.config/omarchy/plugins/videinfra.tandem/install.sh
 ```
 
-`plugin add` clones the widget; `install.sh` generates the Hyprland config and
-adds the loader line, which no Omarchy command can do. Cloning by hand and
-running `./install.sh` from the clone works identically.
+`plugin add` installs the widget. `install.sh` puts it in the bar, generates
+the Hyprland config and adds the loader line — none of which any Omarchy
+command does, since plugins have no hook for compositor config.
 
-`install.sh` copies both plugins into `~/.config/omarchy/plugins/`, swaps the
-bar widget, and generates the Hyprland config. It works with no input: 2
-desktops, autodetected monitors, `SUPER+F`. It then offers the setup wizard,
-but only when a terminal is attached, so piped installs stay non-interactive.
+Cloning by hand and running `./install.sh` from the clone works the same way.
+
+It needs no input: 2 desktops, autodetected monitors, `SUPER+F`. It then
+offers the setup wizard, but only when a terminal is attached, so piped
+installs stay non-interactive.
 
 Run the wizard later:
 
@@ -159,8 +160,8 @@ cd /path/to/tandem
 ./uninstall.sh
 ```
 
-Removes both plugins, restores `omarchy.workspaces` to the slot the widget
-occupied, and strips the loader line from `hyprland.lua`.
+Removes the plugin and both its bar entries, restores `omarchy.workspaces` to
+the slot the indicator occupied, and strips the loader line from `hyprland.lua`.
 
 `omarchy plugin remove videinfra.tandem` works too — the manifest declares
 `"omarchy": { "clonedFrom": "omarchy.workspaces" }`, so the stock widget comes
@@ -168,11 +169,10 @@ back — but the loader line stays in `hyprland.lua` (inert, it is a `pcall`).
 Tandem reloads Hyprland itself on the next desktop switch so the stock
 bindings return.
 
-No clone to hand? Remove both plugins and delete the loader line:
+No clone to hand? Remove the plugin and delete the loader line:
 
 ```bash
 omarchy plugin remove videinfra.tandem
-omarchy plugin remove videinfra.tandem-settings
 sed -i '/videinfra.tandem\/tandem.lua/d; /-- Virtual desktops (videinfra.tandem)/d' ~/.config/hypr/hyprland.lua
 hyprctl reload
 ```

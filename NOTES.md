@@ -84,6 +84,12 @@ button or the bar slot collapses to zero width and the widget never appears.
 does not cover a plugin newly added to the layout, nor some edits to a loaded
 panel.
 
+**An install script must tolerate running from the installed plugin.** The
+`omarchy plugin add` flow leaves the repo at
+`~/.config/omarchy/plugins/<id>/`, so a script run from there has source and
+destination as the same directory: skip the copy, and never wipe the
+destination first, or it deletes itself mid-run.
+
 **One plugin can supply two bar widgets.** A manifest declares a single
 `barWidget` entry point, but `allowMultiple: true` lets the same id appear
 twice in `shell.json`, and each entry's own keys reach the widget as
