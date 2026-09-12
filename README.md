@@ -181,15 +181,20 @@ line is a `pcall` and does nothing once the file is gone. Tandem also reloads
 Hyprland itself on the next desktop switch, so the stock bindings return even
 without the `hyprctl reload`.
 
-## Is this really all one plugin?
+## Why it needs a setup step
 
-One plugin, two bar entries — but it cannot declare Hyprland config. Omarchy manifests only
-accept Quickshell kinds, so there is no *declarative* hook — but plugin QML is
-not sandboxed (`authentication` is the registry's only gated capability), so
-Tandem does it imperatively: the widget shells out, the wizard writes
-settings, and `tandem-apply` generates the Lua.
+An Omarchy plugin is QML. Manifests accept only Quickshell kinds, so there is
+no declarative hook for keybindings or workspace rules, and `omarchy plugin
+add` deliberately runs nothing from the plugin it installs.
 
-The alternative, injecting binds at runtime via `hyprctl eval`, works but is
+Plugin QML is not sandboxed, though — `authentication` is the registry's only
+gated capability — so Tandem does it imperatively: the widget launches the
+wizard, the wizard writes settings, and `tandem-apply` generates the Lua and
+adds the loader line. Nothing is written until you answer the wizard.
+[crmne.hyprmoncfg](https://github.com/crmne/omarchy-hyprmoncfg) works the same
+way, down to editing Hyprland config from the script its button runs.
+
+The alternative, injecting binds at runtime with `hyprctl eval`, works but is
 wiped by every `hyprctl reload` and would need a service re-applying on
 `configreloaded`. Generating real config is sturdier.
 
