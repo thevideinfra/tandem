@@ -119,6 +119,9 @@ bar hands a widget every key on its entry except `id`:
 - `labels` — desktop names. Omit or use `[]` for the `D1`..`Dn` default; a
   short list names only the desktops it covers.
 - `separator` — draws a `|` between bar entries.
+- `toggle` / `send` — the switch key and the carry-a-window key. The wizard
+  asks for one key and derives both (`F` gives `SUPER + F` and
+  `SUPER + SHIFT + F`); set them here to use unrelated keys.
 
 `labels` and `separator` are cosmetic, so changing only those skips the
 Hyprland regenerate-and-reload.
@@ -199,8 +202,6 @@ Plugin QML is not sandboxed, though — `authentication` is the registry's only
 gated capability — so Tandem does it imperatively: the widget launches the
 wizard, the wizard writes settings, and `tandem-apply` generates the Lua and
 adds the loader line. Nothing is written until you answer the wizard.
-[crmne.hyprmoncfg](https://github.com/crmne/omarchy-hyprmoncfg) works the same
-way, down to editing Hyprland config from the script its button runs.
 
 The alternative, injecting binds at runtime with `hyprctl eval`, works but is
 wiped by every `hyprctl reload` and would need a service re-applying on
