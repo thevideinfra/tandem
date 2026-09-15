@@ -27,6 +27,7 @@ Panel {
   property bool separator: false
   property string toggleKey: "SUPER + F"
   property string sendKey: "SUPER + SHIFT + F"
+  property string animation: "slide"
   property var detected: []
   property var savedLabels: []   // normalized from disk, one per desktop
   property var pLabels: []       // staged edits
@@ -38,6 +39,21 @@ Panel {
   property bool pTab: true
   property bool pScroll: true
   property bool pSeparator: false
+  property string pAnimation: "slide"
+
+  // Workspace animation styles Hyprland accepts, plus "none" to leave its own
+  // workspace animation alone. Clicking the row steps through them.
+  readonly property var animations:
+    ["slide", "slidevert", "fade", "slidefade", "slidefadevert", "none"]
+
+  readonly property var animationLabels: ({
+    "slide": "Slide sideways",
+    "slidevert": "Slide up and down",
+    "fade": "Fade",
+    "slidefade": "Slide and fade sideways",
+    "slidefadevert": "Slide and fade vertically",
+    "none": "Hyprland default"
+  })
 
   property bool busy: false
   property string errorText: ""
@@ -47,7 +63,7 @@ Panel {
 
   readonly property bool dirty: pDesktops !== desktops
     || pNumbers !== numbers || pTab !== tabKeys || pScroll !== scrollKeys
-    || pSeparator !== separator || labelsDirty
+    || pSeparator !== separator || pAnimation !== animation || labelsDirty
 
   // Panel is a plain Item; the bar slot takes its size from here, so without
   // this the widget collapses to zero width and never renders.
@@ -67,6 +83,7 @@ Panel {
     pTab = tabKeys
     pScroll = scrollKeys
     pSeparator = separator
+    pAnimation = animation
     errorText = ""
   }
 
@@ -80,6 +97,7 @@ Panel {
       separator = data.separator === true
       toggleKey = data.toggle
       sendKey = data.send
+      animation = data.animation || "slide"
       detected = data.detected || []
       savedLabels = normalizeLabels(data.labels, data.desktops)
       revert()
@@ -96,6 +114,7 @@ Panel {
     if (pTab !== tabKeys) patch.tab = pTab
     if (pScroll !== scrollKeys) patch.scroll = pScroll
     if (pSeparator !== separator) patch.separator = pSeparator
+    if (pAnimation !== animation) patch.animation = pAnimation
     if (labelsDirty) {
       // Blank fields fall back to the default name, and an all-default set is
       // stored as [] so the config does not carry redundant D1..Dn.
@@ -132,6 +151,11 @@ Panel {
     var copy = pLabels.slice()
     copy[i] = text
     pLabels = copy
+  }
+
+  function cycleAnimation() {
+    var i = root.animations.indexOf(root.pAnimation)
+    root.pAnimation = root.animations[(i + 1) % root.animations.length]
   }
 
   function allDefault(arr) {
@@ -378,6 +402,54 @@ Panel {
               }
             }
           }
+        }
+
+        PanelSeparator { width: parent.width; foreground: root.barForeground }
+        PanelSectionHeader { text: "ANIMATION"; foreground: root.barForeground }
+
+        Item {
+          width: parent.width
+          implicitHeight: animLabel.implicitHeight + Style.space(6)
+
+          Text {
+            id: animLabel
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: animValue.left
+            anchors.rightMargin: Style.space(8)
+            text: "Switching"
+            elide: Text.ElideRight
+            color: root.barForeground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+          }
+
+          Text {
+            id: animValue
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: (root.animationLabels[root.pAnimation] || root.pAnimation) + "  "
+            color: root.barForeground
+            opacity: 0.75
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+          }
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.cycleAnimation()
+          }
+        }
+
+        Text {
+          width: parent.width
+          text: "Pick the direction the monitors are arranged in."
+          color: root.barForeground
+          opacity: 0.45
+          wrapMode: Text.WordWrap
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
         }
 
         PanelSeparator { width: parent.width; foreground: root.barForeground }

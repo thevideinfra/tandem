@@ -66,7 +66,8 @@ It asks for monitor order, desktop count, names and keys, writes them to
 ![Settings panel](assets/settings-panel.png)
 
 The **settings panel** (grid icon, right of the bar) edits desktop count,
-names, keybindings and the `|` separator, and lists the detected monitors.
+names, keybindings, the switching animation and the `|` separator, and lists
+the detected monitors.
 Edits are **staged** until you press Apply — each write regenerates and
 reloads the Hyprland config, too disruptive to do per click. Revert discards
 staged edits; so does closing the panel.
@@ -112,13 +113,18 @@ bar hands a widget every key on its entry except `id`:
   "numbers":  true,
   "tab":      true,
   "scroll":   true,
-  "separator": false }
+  "separator": false,
+  "animation": "slide" }
 ```
 
 - `monitors` — omit to autodetect, ordered top-to-bottom then left-to-right.
 - `labels` — desktop names. Omit or use `[]` for the `D1`..`Dn` default; a
   short list names only the desktops it covers.
 - `separator` — draws a `|` between bar entries.
+- `animation` — how a switch is drawn: `slide`, `slidevert`, `fade`,
+  `slidefade`, `slidefadevert`, or `none` to keep Hyprland's own workspace
+  animation. Match the direction the monitors are arranged in — `slide` for
+  side by side, `slidevert` for stacked.
 - `toggle` / `send` — the switch key and the carry-a-window key. The wizard
   asks for one key and derives both (`F` gives `SUPER + F` and
   `SUPER + SHIFT + F`); set them here to use unrelated keys.

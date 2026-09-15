@@ -31,6 +31,15 @@ function tandem_show(desk) show(desk) return hl.dsp.no_op() end
 **`monitor:set_workspace` does not emit `workspace.active`.** `hl.dsp.focus`
 does. Anything hooked to that event misses switches made by `set_workspace`.
 
+**`hl.animation` needs a curve.** Passing only `{ leaf = ..., enabled = ...,
+style = ... }` errors; one of `bezier` or `spring` is required.
+
+**Hyprland validates animation styles and rejects unknown ones.** Verified
+against a live compositor: `slide`, `slidevert`, `fade`, `slidefade` and
+`slidefadevert` apply to `workspaces`; `popin` does not. A bad value breaks
+the whole generated config, so `tandem-apply` and `tandem-config` both check
+the name against that list before writing it.
+
 **`hl.dsp.cursor.move` is absolute, not relative**, and clamps into the
 nearest monitor.
 

@@ -102,11 +102,19 @@ tab=$(ask "Bind SUPER+TAB / SUPER+SHIFT+TAB to cycle desktops?" "$(current tab t
 scroll=$(ask "Bind SUPER+scroll to cycle desktops?" "$(current scroll true)")
 separator=$(ask "Draw a | between desktops in the bar?" "$(current separator false)")
 
+# Which way the desktops appear to move when switching. Side-by-side monitors
+# usually suit the horizontal slide; stacked ones often read better vertical.
+animation=$(gum choose --header "Switching animation" \
+  --selected "$(current animation slide)" \
+  slide slidevert fade slidefade slidefadevert none)
+[[ -n $animation ]] || animation=$(current animation slide)
+
 echo
 echo "  SUPER+1..$desktops: $numbers"
 echo "  SUPER+TAB:        $tab"
 echo "  SUPER+scroll:     $scroll"
 echo "  separator:        $separator"
+echo "  animation:        $animation"
 echo
 
 # --- desktop names ----------------------------------------------------------
@@ -137,8 +145,10 @@ settings=$(jq -nc \
   --arg toggle "$toggle" --arg send "$send" \
   --argjson numbers "$numbers" --argjson tab "$tab" --argjson scroll "$scroll" \
   --argjson separator "$separator" \
+  --arg animation "$animation" \
   '{desktops: $desktops, toggle: $toggle, send: $send,
-    numbers: $numbers, tab: $tab, scroll: $scroll, separator: $separator}
+    numbers: $numbers, tab: $tab, scroll: $scroll, separator: $separator,
+    animation: $animation}
    | if $monitors == null then . else .monitors = $monitors end
    | if $labels   == null then . else .labels   = $labels   end')
 
