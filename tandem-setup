@@ -62,11 +62,26 @@ desktops=$(gum choose --header "How many virtual desktops?" \
 [[ -n $desktops ]] || exit 1
 
 # --- keys -------------------------------------------------------------------
-toggle=$(gum input --header "Key to go to the next desktop" \
-  --value "$(current toggle "SUPER + F")")
-send=$(gum input --header "Key to send the focused window to the next desktop" \
-  --value "$(current send "SUPER + SHIFT + F")")
-[[ -n $toggle && -n $send ]] || { echo "tandem-setup: keys cannot be empty" >&2; exit 1; }
+# One key drives both bindings: SUPER switches desktop, SUPER+SHIFT takes the
+# focused window along. Asking for the two independently let them drift apart
+# -- changing only the switch key left the send binding on the old one, so the
+# change looked like it had not applied.
+current_key=$(current toggle "SUPER + F")
+current_key=${current_key##*+ }
+current_key=${current_key:-F}
+
+key=$(gum input --header "Key for switching desktops (used with SUPER)" \
+  --value "$current_key")
+key=${key## }
+key=${key%% }
+[[ -n $key ]] || { echo "tandem-setup: key cannot be empty" >&2; exit 1; }
+[[ $key != *'"'* && $key != *+* ]] \
+  || { echo "tandem-setup: give just the key, e.g. F -- SUPER is added for you" >&2; exit 1; }
+
+toggle="SUPER + $key"
+send="SUPER + SHIFT + $key"
+echo "  switch desktop:   $toggle"
+echo "  send window:      $send"
 
 # One question per binding. A gum multi-select needs space to tick each row and
 # enter only confirms what is already ticked, so pressing enter on a highlighted
