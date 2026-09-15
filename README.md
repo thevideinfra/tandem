@@ -203,9 +203,6 @@ gated capability — so Tandem does it imperatively: the widget launches the
 wizard, the wizard writes settings, and `tandem-apply` generates the Lua and
 adds the loader line. Nothing is written until you answer the wizard.
 
-The alternative, injecting binds at runtime with `hyprctl eval`, works but is
-wiped by every `hyprctl reload` and would need a service re-applying on
-`configreloaded`. Generating real config is sturdier.
 
 ## Notes
 
