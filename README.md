@@ -68,9 +68,15 @@ One key answer gives both binds: `F` becomes `SUPER + F` to switch and
 
 ![Settings panel](assets/settings-panel.png)
 
-The **settings panel** (grid icon, right of the bar) edits desktop count,
-names, keybindings, the switching animation and the `|` separator, and lists
-the detected monitors.
+The **settings panel** (grid icon, right of the bar) covers everything the
+wizard does except the monitor order, which it lists read-only:
+
+- `−` / `+` for the desktop count, and a text field per desktop name.
+- A switch per key option — `SUPER+1..n`, `SUPER+TAB`, `SUPER+scroll` — plus
+  the `|` separator. Click anywhere on the row.
+- `‹` / `›` step through the switching animation.
+- The switch and send keys are shown but set in the wizard.
+
 Edits are **staged** until you press Apply — each write regenerates and
 reloads the Hyprland config, too disruptive to do per click. Revert discards
 staged edits; so does closing the panel.
@@ -123,6 +129,9 @@ bar hands a widget every key on its entry except `id`:
 - `monitors` — omit to autodetect, ordered top-to-bottom then left-to-right.
 - `labels` — desktop names. Omit or use `[]` for the `D1`..`Dn` default; a
   short list names only the desktops it covers.
+- `numbers` / `tab` / `scroll` — the optional binds: `SUPER+1`..`n`,
+  `SUPER+TAB`, and `SUPER+scroll`. Set one `false` to leave that key to
+  Omarchy.
 - `separator` — draws a `|` between bar entries.
 - `animation` — how a switch is drawn: `slide`, `slidevert`, `fade`,
   `slidefade`, `slidefadevert`, or `none` to keep Hyprland's own workspace
