@@ -46,6 +46,7 @@ get)
       tab:      (if has("tab")      and .tab      != null then .tab      else true end),
       scroll:   (if has("scroll")   and .scroll   != null then .scroll   else true end),
       separator:(if has("separator") and .separator!= null then .separator else false end),
+      animation:(if has("animation") and .animation!= null then .animation else "slide" end),
       monitors: (if has("monitors") and .monitors != null then .monitors else null end),
       labels:   (if has("labels")   and .labels   != null then .labels   else null end),
       detected: $monitors,
@@ -76,6 +77,16 @@ set | set-json)
                         and (test("\"") | not))' <<<"$value" >/dev/null 2>&1 \
       || { echo "tandem-config: labels must be up to 10 names, 1-16 chars, no quotes" >&2; return 1; }
     json=$value
+    ;;
+  animation)
+    case "$value" in
+    slide | slidevert | fade | slidefade | slidefadevert | none) ;;
+    *)
+      echo "tandem-config: animation must be slide, slidevert, fade, slidefade, slidefadevert or none" >&2
+      return 1
+      ;;
+    esac
+    json=$(jq -nc --arg v "$value" '$v')
     ;;
   toggle | send)
     [[ -n $value && $value != *'"'* ]] \

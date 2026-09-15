@@ -44,6 +44,15 @@ SEND=$(get send "SUPER + SHIFT + F")
 NUMBERS=$(get numbers true)
 TAB=$(get tab true)
 SCROLL=$(get scroll true)
+ANIMATION=$(get animation slide)
+
+case "$ANIMATION" in
+slide | slidevert | fade | slidefade | slidefadevert | none) ;;
+*)
+  echo "tandem-apply: unknown animation '$ANIMATION'" >&2
+  exit 1
+  ;;
+esac
 
 [[ $DESKTOPS =~ ^[0-9]+$ ]] && (( DESKTOPS >= 1 && DESKTOPS <= 10 )) \
   || { echo "tandem-apply: 'desktops' must be 1-10, got '$DESKTOPS'" >&2; exit 1; }
@@ -85,6 +94,7 @@ tmp=$(mktemp)
   echo ""
   echo "local MONITORS = { $lua_list }"
   echo "local DESKTOPS = $DESKTOPS"
+  echo "local ANIMATION = \"$ANIMATION\""
   echo "local KEYS = {"
   echo "  toggle  = \"$TOGGLE\","
   echo "  send    = \"$SEND\","

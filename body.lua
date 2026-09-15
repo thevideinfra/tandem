@@ -200,5 +200,10 @@ function tandem_show(desk)
 end
 
 -- Slide the whole desktop sideways instead of the default workspace fade.
-hl.curve("tandem", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.0 } } })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 10, bezier = "tandem", style = "slide" })
+-- Slide the whole desktop instead of the default workspace fade. "slide" moves
+-- sideways and "slidevert" up and down; pick whichever matches how the
+-- monitors are arranged. "none" leaves Hyprland's own workspace animation.
+if ANIMATION ~= "none" then
+  hl.curve("tandem", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.0 } } })
+  hl.animation({ leaf = "workspaces", enabled = true, speed = 10, bezier = "tandem", style = ANIMATION })
+end
