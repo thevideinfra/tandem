@@ -153,9 +153,10 @@ Panel {
     pLabels = copy
   }
 
-  function cycleAnimation() {
+  function cycleAnimation(step) {
+    var n = root.animations.length
     var i = root.animations.indexOf(root.pAnimation)
-    root.pAnimation = root.animations[(i + 1) % root.animations.length]
+    root.pAnimation = root.animations[((i + step) % n + n) % n]
   }
 
   function allDefault(arr) {
@@ -362,16 +363,22 @@ Panel {
             { key: "separator", label: "Separator between desktops",                        on: root.pSeparator }
           ]
 
+          // A real switch rather than a check/cross glyph: the marks did not
+          // read as something you could click. `Toggle` is the labeled kit
+          // component, but its 54px rows make the panel far too tall for four
+          // of them, so this is the same pairing at panel-row height, with the
+          // row owning the click.
           Item {
             required property var modelData
             width: column.width
-            implicitHeight: rowLabel.implicitHeight + Style.space(6)
+            implicitHeight: Math.max(rowLabel.implicitHeight, rowSwitch.implicitHeight)
+              + Style.space(4)
 
             Text {
               id: rowLabel
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              anchors.right: mark.left
+              anchors.right: rowSwitch.left
               anchors.rightMargin: Style.space(8)
               text: modelData.label
               elide: Text.ElideRight
@@ -380,19 +387,25 @@ Panel {
               font.pixelSize: Style.font.body
             }
 
-            Text {
-              id: mark
+            ToggleSwitch {
+              id: rowSwitch
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              text: modelData.on ? "" : ""
-              color: root.barForeground
-              opacity: modelData.on ? 1 : 0.45
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
+              checked: modelData.on
+              foreground: root.barForeground
+              trackHeight: Style.space(18)
+              // The row below owns the click, so this is presentation only.
+              // The cursor ring still follows the row's hover, since with
+              // `interactive` off the switch never sees the pointer itself.
+              interactive: false
+              cursorRing: true
+              hasCursor: rowMouse.containsMouse
             }
 
             MouseArea {
+              id: rowMouse
               anchors.fill: parent
+              hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: {
                 if (modelData.key === "numbers") root.pNumbers = !root.pNumbers
@@ -407,38 +420,39 @@ Panel {
         PanelSeparator { width: parent.width; foreground: root.barForeground }
         PanelSectionHeader { text: "ANIMATION"; foreground: root.barForeground }
 
-        Item {
+        // Same shape as the desktop count above: arrows either side of the
+        // value, so the row reads as adjustable without having to be clicked
+        // to find out.
+        Row {
           width: parent.width
-          implicitHeight: animLabel.implicitHeight + Style.space(6)
+          spacing: Style.space(10)
 
           Text {
-            id: animLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.right: animValue.left
-            anchors.rightMargin: Style.space(8)
-            text: "Switching"
+            width: parent.width - prevAnim.width - nextAnim.width - Style.space(20)
+            text: root.animationLabels[root.pAnimation] || root.pAnimation
             elide: Text.ElideRight
             color: root.barForeground
             font.family: Style.font.family
             font.pixelSize: Style.font.body
-          }
-
-          Text {
-            id: animValue
-            anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            text: (root.animationLabels[root.pAnimation] || root.pAnimation) + "  "
-            color: root.barForeground
-            opacity: 0.75
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
           }
 
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.cycleAnimation()
+          PanelActionButton {
+            id: prevAnim
+            iconText: "\uf053"
+            tooltipText: "Previous animation"
+            foreground: root.barForeground
+            bordered: true
+            onClicked: root.cycleAnimation(-1)
+          }
+
+          PanelActionButton {
+            id: nextAnim
+            iconText: "\uf054"
+            tooltipText: "Next animation"
+            foreground: root.barForeground
+            bordered: true
+            onClicked: root.cycleAnimation(1)
           }
         }
 
