@@ -44,7 +44,8 @@ omarchy plugin add https://github.com/thevideinfra/tandem.git --enable
 
 The widget appears in the bar reading **Set up Tandem**. Click it: a terminal
 opens with the setup wizard, which asks for monitor order, desktop count,
-names and each keybinding. Nothing touches Hyprland until you answer it.
+names, the switch key and the switching animation. Nothing touches Hyprland
+until you answer it.
 
 On finishing, the wizard writes your answers, generates the Hyprland config,
 adds the settings widget to the right of the bar, and the indicator becomes
@@ -52,7 +53,7 @@ adds the settings widget to the right of the bar, and the indicator becomes
 
 Cloning the repo and running `./install.sh` does the same thing
 non-interactively, with defaults — 2 desktops, autodetected monitors,
-`SUPER+F` — and is the scripted path.
+`SUPER+F`, horizontal slide — and is the scripted path.
 
 Re-run the wizard any time:
 
@@ -60,8 +61,10 @@ Re-run the wizard any time:
 ~/.config/omarchy/plugins/videinfra.tandem/tandem-setup
 ```
 
-It asks for monitor order, desktop count, names and keys, writes them to
-`shell.json`, and regenerates the Hyprland config.
+It asks for monitor order, desktop count, names, the switch key and the
+animation, writes them to `shell.json`, and regenerates the Hyprland config.
+One key answer gives both binds: `F` becomes `SUPER + F` to switch and
+`SUPER + SHIFT + F` to carry a window.
 
 ![Settings panel](assets/settings-panel.png)
 
