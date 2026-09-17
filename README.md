@@ -6,6 +6,8 @@ Every monitor switches workspace **together**, instead of Omarchy's default of
 independent per-monitor workspaces. The bar shows `D1 D2` instead of
 workspaces `1-5`.
 
+![Tandem](preview.png)
+
 Built with Claude Code.
 
 ## Why
