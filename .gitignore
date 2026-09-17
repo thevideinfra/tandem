@@ -1,2 +1,6 @@
 omarchy/plugins/videinfra.tandem/tandem.lua
 *.bak.*
+
+# Source captures for preview.png, kept local
+assets/previewsettings.png
+assets/previewindicator.png
