@@ -1,4 +1,4 @@
-omarchy/plugins/videinfra.tandem/tandem.lua
+/tandem.lua
 *.bak.*
 
 # Source captures for preview.png, kept local
