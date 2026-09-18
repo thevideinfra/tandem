@@ -18,8 +18,6 @@ https://github.com/user-attachments/assets/117b8858-4796-4549-ae8f-0be6ca892d04
 
 *One keypress; both monitors move together.*
 
-![Tandem bar indicator](assets/bar-indicator.png)
-
 ## Model
 
 A desktop owns one workspace per monitor:
