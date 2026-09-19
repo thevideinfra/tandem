@@ -81,6 +81,24 @@ Edits are **staged** until you press Apply — each write regenerates and
 reloads the Hyprland config, too disruptive to do per click. Revert discards
 staged edits; so does closing the panel.
 
+## Updating
+
+```bash
+omarchy plugin update videinfra.tandem
+omarchy restart shell
+```
+
+> **Installed before 19 Sep 2026?** The repository history was rewritten on
+> that date, so `omarchy plugin update` stops with "cannot fast-forward".
+> Your install still works. Move it onto the new history once — this keeps
+> your settings and generated config:
+>
+> ```bash
+> git -C ~/.config/omarchy/plugins/videinfra.tandem fetch origin
+> git -C ~/.config/omarchy/plugins/videinfra.tandem reset --hard origin/main
+> omarchy restart shell
+> ```
+
 ## Layout
 
 The repo root is the plugin, as `omarchy plugin add` requires.
