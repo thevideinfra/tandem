@@ -289,7 +289,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(root.sp(380))
+    // Compact would otherwise cut off the longer switch labels.
+    contentWidth: panel.fittedContentWidth(Math.max(root.sp(304), Style.space(215)))
     contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
