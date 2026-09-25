@@ -66,7 +66,10 @@ animation, writes them to `shell.json`, and regenerates the Hyprland config.
 One key answer gives both binds: `F` becomes `SUPER + F` to switch and
 `SUPER + SHIFT + F` to carry a window.
 
-![Settings panel](assets/settings-panel.png)
+<p>
+  <img src="assets/settings-panel.png" alt="The Tandem panel: desktop count, a name field per desktop with the current one marked in the accent colour, the monitors with their positions, and the keys" width="324">
+  <img src="assets/settings-view.png" alt="The panel's settings view: density, font size, switches for the monitors and keys sections, the key options, the separator, the animation and the setup wizard" width="324">
+</p>
 
 The **settings panel** (grid icon, right of the bar) covers everything the
 wizard does except the monitor order, which it lists read-only. Its main view
