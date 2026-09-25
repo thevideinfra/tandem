@@ -69,17 +69,28 @@ One key answer gives both binds: `F` becomes `SUPER + F` to switch and
 ![Settings panel](assets/settings-panel.png)
 
 The **settings panel** (grid icon, right of the bar) covers everything the
-wizard does except the monitor order, which it lists read-only:
+wizard does except the monitor order, which it lists read-only. Its main view
+holds:
 
-- `−` / `+` for the desktop count, and a text field per desktop name.
-- A switch per key option — `SUPER+1..n`, `SUPER+TAB`, `SUPER+scroll` — plus
-  the `|` separator. Click anywhere on the row.
-- `‹` / `›` step through the switching animation.
-- The switch and send keys are shown but set in the wizard.
+- `−` / `+` for the desktop count, and a text field per desktop name. The
+  desktop you are on is marked in your theme's accent colour.
+- The monitors, each with where it sits (Top / Bottom when stacked, Left /
+  Right side by side), and the switch and send keys. These are set in the
+  wizard.
 
-Edits are **staged** until you press Apply — each write regenerates and
-reloads the Hyprland config, too disruptive to do per click. Revert discards
-staged edits; so does closing the panel.
+The ⚙ in the panel header opens its settings:
+
+- A **Compact**, **Normal** or **Comfortable** layout and a **Small**,
+  **Normal** or **Large** font size, and switches to hide the monitors and
+  keys sections. These save as you click.
+- A switch per key option — `SUPER+1..n`, `SUPER+TAB`, `SUPER+scroll` — and
+  one for the `|` separator. Click anywhere on the row.
+- The switching animation.
+- Re-run setup wizard.
+
+Desktop, name, key and animation edits are **staged** until you press Apply —
+each write regenerates and reloads the Hyprland config, too disruptive to do
+per click. Revert discards staged edits; so does closing the panel.
 
 ## Updating
 
@@ -141,7 +152,11 @@ bar hands a widget every key on its entry except `id`:
   "tab":      true,
   "scroll":   true,
   "separator": false,
-  "animation": "slide" }
+  "animation": "slide",
+  "density":  "normal",
+  "fontSize": "normal",
+  "showMonitors": true,
+  "showKeys": true }
 ```
 
 - `monitors` — omit to autodetect, ordered top-to-bottom then left-to-right.
@@ -158,6 +173,10 @@ bar hands a widget every key on its entry except `id`:
 - `toggle` / `send` — the switch key and the carry-a-window key. The wizard
   asks for one key and derives both (`F` gives `SUPER + F` and
   `SUPER + SHIFT + F`); set them here to use unrelated keys.
+- `density` / `fontSize` — the settings panel's own layout: `compact`,
+  `normal` or `comfortable`, and `small`, `normal` or `large`. They change
+  nothing in Hyprland or the bar.
+- `showMonitors` / `showKeys` — show the panel's MONITORS and KEYS sections.
 
 `labels` and `separator` are cosmetic, so changing only those skips the
 Hyprland regenerate-and-reload.
