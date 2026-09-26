@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "videinfra.tandem",
   "name": "Tandem",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "videinfra",
   "license": "MIT",
   "description": "Virtual desktops that move every monitor together",
