@@ -277,7 +277,14 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "󰕰"   // nf-md-view-grid, solid 2x2
+    iconComponent: Component {
+      Item {
+        TandemIcon {
+          anchors.centerIn: parent
+          color: root.barForeground
+        }
+      }
+    }
     tooltipText: "Tandem · virtual desktops"
     onPressed: function(b) { root.toggle() }
   }
@@ -312,13 +319,10 @@ Panel {
           width: parent.width
           implicitHeight: Math.max(headerIcon.implicitHeight, headerLabels.implicitHeight, gearButton.implicitHeight)
 
-          Text {
+          TandemIcon {
             id: headerIcon
-            textFormat: Text.PlainText
-            text: "󰕰"
+            iconWidth: Math.round(root.fontDisplay * 1.3)
             color: Color.accent
-            font.family: Style.font.family
-            font.pixelSize: root.fontDisplay
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
           }
@@ -326,7 +330,7 @@ Panel {
           Column {
             id: headerLabels
             anchors.left: headerIcon.right
-            anchors.leftMargin: root.sp(14)
+            anchors.leftMargin: root.sp(10)
             anchors.right: gearButton.left
             anchors.rightMargin: root.sp(12)
             anchors.verticalCenter: parent.verticalCenter
