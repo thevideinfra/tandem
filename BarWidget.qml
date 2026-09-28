@@ -31,6 +31,7 @@ Item {
     if ("bar" in item) item.bar = root.bar
     if ("moduleName" in item) item.moduleName = root.moduleName
     if ("settings" in item) item.settings = root.settings
+    if ("popoutOwner" in item) item.popoutOwner = root
   }
 
   onBarChanged: forward()
@@ -43,6 +44,16 @@ Item {
   function open() { if (loader.item && loader.item.open) loader.item.open() }
   function close() { if (loader.item && loader.item.close) loader.item.close() }
   function toggle() { if (loader.item && loader.item.toggle) loader.item.toggle() }
+
+  // The bar draws its open-panel mark under a slot when the active popout is
+  // that slot's item -- this wrapper, not the Settings panel inside it. The
+  // panel registers this wrapper as its popout owner, so the wrapper also
+  // answers what the bar and KeyboardPanel ask of an owner.
+  readonly property bool popoutSwitchClosing:
+    !!(loader.item && loader.item.popoutSwitchClosing === true)
+  function closeForPopoutSwitch() {
+    if (loader.item && loader.item.closeForPopoutSwitch) loader.item.closeForPopoutSwitch()
+  }
 
   Loader {
     id: loader

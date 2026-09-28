@@ -19,6 +19,10 @@ Panel {
   moduleName: "videinfra.tandem"
   ipcTarget: "videinfra.tandem"
 
+  // Set by BarWidget.qml. The bar only marks a panel as open when its
+  // registered owner is the item in the bar slot, which is that wrapper.
+  property var popoutOwner: null
+
   readonly property string pluginDir:
     Quickshell.env("HOME") + "/.config/omarchy/plugins/videinfra.tandem"
 
@@ -292,7 +296,7 @@ Panel {
   KeyboardPanel {
     id: panel
     anchorItem: button
-    owner: root
+    owner: root.popoutOwner || root
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
