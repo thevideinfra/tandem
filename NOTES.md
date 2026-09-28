@@ -28,8 +28,17 @@ and must be handed a dispatcher back. A global that does work and returns
 function tandem_show(desk) show(desk) return hl.dsp.no_op() end
 ```
 
-**`monitor:set_workspace` does not emit `workspace.active`.** `hl.dsp.focus`
-does. Anything hooked to that event misses switches made by `set_workspace`.
+**`monitor:set_workspace` usually does not emit `workspace.active`.**
+`hl.dsp.focus` does. The exception: switching a monitor while focus is on
+another one can emit it mid-switch, so a handler that follows workspace
+changes must ignore events while tandem is moving monitors itself (`moving`
+in `body.lua`), or it chases the half-finished switch.
+
+**Undo a focus-driven switch after the dispatch, not inside it.** Focusing a
+window on a hidden workspace switches that monitor and emits
+`workspace.active` from inside the dispatch. Calling `set_workspace` from the
+handler gets overridden as the dispatch continues and flip-flops; a 1 ms
+`hl.timer` lands after it and sticks.
 
 **`hl.animation` needs a curve.** Passing only `{ leaf = ..., enabled = ...,
 style = ... }` errors; one of `bezier` or `spring` is required.

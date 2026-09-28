@@ -4,11 +4,29 @@ local function workspace(desk, index)
   return (desk - 1) * COUNT + index
 end
 
+-- The desktop a workspace id belongs to, or nil for special workspaces and
+-- anything outside the tandem range.
+local function desk_of(id)
+  if not id or id < 1 or id > DESKTOPS * COUNT then return nil end
+  return math.floor((id - 1) / COUNT) + 1
+end
+
 local function current_desk()
   local ws = hl.get_active_workspace()
-  local id = ws and ws.id
-  if not id or id < 1 or id > DESKTOPS * COUNT then return 1 end
-  return math.floor((id - 1) / COUNT) + 1
+  return desk_of(ws and ws.id) or 1
+end
+
+-- The desktop every monitor is on, or nil while they are split.
+local function shared_desk()
+  local shared = nil
+  for _, name in ipairs(MONITORS) do
+    local monitor = hl.get_monitor(name)
+    local ws = monitor and monitor.active_workspace
+    local desk = desk_of(ws and ws.id)
+    if not desk or (shared and desk ~= shared) then return nil end
+    shared = desk
+  end
+  return shared
 end
 
 -- Self-heal after `omarchy plugin remove`: it deletes the plugin but never
@@ -33,12 +51,52 @@ local function heal_if_removed()
   return true
 end
 
+-- The desktop the monitors should all be on. Set by every switch tandem makes
+-- and by the follow handler below; nil until the first one.
+local desired = nil
+local settling = false
+local switches = 0   -- only the latest switch's timer may end settling
+-- set_workspace can emit workspace.active itself when focus crosses monitors,
+-- which would make the follow handler below chase tandem's own half-finished
+-- switch. It ignores events while this is set.
+local moving = false
+
+-- Put any monitor that is off `desk` back on it. Monitors already there are
+-- left alone, since set_workspace also moves focus.
+local function realign(desk)
+  moving = true
+  for index, name in ipairs(MONITORS) do
+    local monitor = hl.get_monitor(name)
+    local ws = monitor and monitor.active_workspace
+    local want = workspace(desk, index)
+    if monitor and not (ws and ws.id == want) then
+      monitor:set_workspace({ workspace = tostring(want) })
+    end
+  end
+  moving = false
+end
+
 local function show(desk)
   if heal_if_removed() then return end
+  desired = desk
+  -- An app hidden by the switch can ask to be activated within a millisecond
+  -- (a fullscreen game does), and with focus_on_activate Hyprland switches
+  -- that one monitor straight back, splitting the desktops. For a moment
+  -- after tandem's own switch, undo that rather than follow it.
+  settling = true
+  switches = switches + 1
+  local this = switches
+  moving = true
   for index, name in ipairs(MONITORS) do
     local monitor = hl.get_monitor(name)
     if monitor then monitor:set_workspace({ workspace = tostring(workspace(desk, index)) }) end
   end
+  moving = false
+  hl.timer(function() if desired then realign(desired) end end, { timeout = 150, type = "oneshot" })
+  hl.timer(function()
+    if desired then realign(desired) end
+    if this == switches then settling = false end
+  end, { timeout = 400, type = "oneshot" })
 end
 
 local function monitor_index(name)
@@ -64,9 +122,33 @@ local function send(desk, window)
   show(desk)
 end
 
+-- Step from where the monitors actually are. If they are split, the desktop
+-- tandem last switched to is the one they belong on.
 local function step(offset)
-  return (current_desk() - 1 + offset) % DESKTOPS + 1
+  local base = shared_desk() or desired or current_desk()
+  return (base - 1 + offset) % DESKTOPS + 1
 end
+
+-- Anything else that switches one monitor -- clicking an app that activates
+-- itself, a notification, a stray workspace command -- brings the others to
+-- the same desktop, keeping focus where it landed. The refocus comes back
+-- through here too, and finds the monitors already aligned.
+hl.on("workspace.active", function()
+  if moving then return end
+  local desk = desk_of((hl.get_active_workspace() or {}).id)
+  if not desk then return end
+  if settling then
+    -- Undo a pull-back after the dispatch that caused it has finished;
+    -- switching back from inside it gets overridden and flip-flops.
+    hl.timer(function() if desired then realign(desired) end end, { timeout = 1, type = "oneshot" })
+    return
+  end
+  if desk == desired and shared_desk() == desk then return end
+  desired = desk
+  local window = hl.get_active_window()
+  realign(desk)
+  if window then hl.dispatch(hl.dsp.focus({ window = "address:" .. window.address })) end
+end)
 
 -- Pin every workspace to its monitor so nothing drifts between screens.
 for desk = 1, DESKTOPS do
