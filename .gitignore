@@ -4,3 +4,6 @@
 # Source captures for preview.png, kept local
 assets/previewsettings.png
 assets/previewindicator.png
+
+# Local diagnosis notes, kept out of the repo
+KNOWN-ISSUES.md
