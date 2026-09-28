@@ -36,6 +36,11 @@ Two monitors, two desktops:
 A persistent workspace rule pins each workspace to its monitor, so nothing
 drifts between screens.
 
+The monitors also stay on the same desktop. If an app switches one monitor
+by activating itself — a fullscreen game grabbing focus back the moment its
+desktop is hidden, say — tandem undoes it for a moment after its own switch,
+and otherwise brings the other monitors along to the same desktop.
+
 ## Install
 
 ```bash
@@ -71,7 +76,7 @@ One key answer gives both binds: `F` becomes `SUPER + F` to switch and
   <img src="assets/settings-view.png" alt="The panel's settings view: density, font size, switches for the monitors and keys sections, the key options, the separator, the animation and the setup wizard" width="324">
 </p>
 
-The **settings panel** (grid icon, right of the bar) covers everything the
+The **settings panel** (two-monitor icon, right of the bar) covers everything the
 wizard does except the monitor order, which it lists read-only. Its main view
 holds:
 
@@ -122,6 +127,7 @@ manifest.json     bar-widget plugin, allowMultiple
 BarWidget.qml     entry point; picks a role from its bar entry
 Indicator.qml     the D1/D2 indicator
 Settings.qml      the settings panel
+TandemIcon.qml    the two-monitor bar icon
 body.lua          the logic, hand-maintained
 tandem-apply      generates tandem.lua from settings, installs the loader
 tandem-setup      gum wizard; writes settings, then calls tandem-apply
@@ -209,7 +215,7 @@ Defaults; all configurable.
 | `SUPER + drag`, then a keyboard switch | Carry the dragged window one desktop |
 | `SUPER + drag`, then `SUPER + scroll` | Carry it across any number of desktops |
 
-Clicking `D1` / `D2` switches desktop. The grid icon opens the settings panel.
+Clicking `D1` / `D2` switches desktop. The two-monitor icon opens the settings panel.
 
 `tandem.lua` retires the stock per-monitor workspace bindings, which move one
 screen at a time and desync the desktops.
