@@ -68,6 +68,7 @@ Panel {
   property string fontSize: "normal"
   property bool showMonitors: true
   property bool showKeys: true
+  property bool popup: false
   readonly property real densityScale:
     density === "compact" ? 0.61 : (density === "comfortable" ? 0.83 : 0.71)
   // Text shrinks half as fast as spacing so compact stays readable, then the
@@ -82,6 +83,16 @@ Panel {
   readonly property real fontCaption: Math.max(9, Math.round(Style.font.caption * fontScale))
   readonly property real fontDisplay: Math.round(Style.font.display * fontScale)
   property bool settingsOpen: false
+
+  // Room a switch row needs for its longest label plus the switch itself.
+  readonly property real labelWidth: Math.ceil(labelMetrics.advanceWidth) + root.sp(8) + root.sp(34)
+
+  TextMetrics {
+    id: labelMetrics
+    font.family: Style.font.family
+    font.pixelSize: root.fontBody
+    text: "SUPER+1..10 jumps to a desktop"
+  }
 
   // Style.space scaled by the chosen density.
   function sp(px) {
@@ -179,6 +190,7 @@ Panel {
       fontSize = data.fontSize || "normal"
       showMonitors = data.showMonitors !== false
       showKeys = data.showKeys !== false
+      popup = data.popup === true
       detected = data.detected || []
       savedLabels = normalizeLabels(data.labels, data.desktops)
       revert()
@@ -300,8 +312,9 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    // Compact would otherwise cut off the longer switch labels.
-    contentWidth: panel.fittedContentWidth(Math.max(root.sp(304), Style.space(215)))
+    // Wide enough for the longest switch label, measured, so a theme with a
+    // different text-to-spacing ratio does not cut it off.
+    contentWidth: panel.fittedContentWidth(Math.max(root.sp(304), root.labelWidth + panel.verticalContentInset))
     contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
@@ -745,6 +758,16 @@ Panel {
       label: "Separator between desktops"
       checked: root.pSeparator
       onToggled: root.pSeparator = !root.pSeparator
+    }
+
+    PanelSeparator { foreground: root.barForeground }
+    SectionHeader { text: "POPUP" }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Show a pager when switching"
+      checked: root.popup
+      onToggled: root.setDisplay("popup", !root.popup)
     }
 
     PanelSeparator { foreground: root.barForeground }

@@ -35,6 +35,88 @@ BarWidget {
     ? 1
     : Math.max(1, Math.ceil(Hyprland.focusedWorkspace.id / monitorCount))
 
+  // The popup's on/off switch and the animation style are read from
+  // shell.json directly. Injected `settings` only refreshes when the bar
+  // rebuilds the widget, so neither would follow a change made in the panel
+  // until a shell restart; the file is watched, as the shell does itself.
+  property bool popupOn: false
+  property string animation: "slide"
+  property var popupLabels: []
+
+  FileView {
+    id: liveConfig
+    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.readLive(text())
+    onFileChanged: reload()
+  }
+
+  function readLive(text) {
+    try {
+      var layout = (JSON.parse(text).bar || {}).layout || {}
+      var sections = ["left", "center", "right"]
+      for (var i = 0; i < sections.length; i++) {
+        var entries = layout[sections[i]] || []
+        for (var j = 0; j < entries.length; j++) {
+          var e = entries[j]
+          if (e && e.id === "videinfra.tandem" && e.role !== "settings") {
+            root.popupOn = e.popup === true
+            root.animation = e.animation || "slide"
+            root.popupLabels = e.labels || []
+            return
+          }
+        }
+      }
+    } catch (err) {}
+  }
+
+  // Desktop the popup last reported, and a short settle so a switch that
+  // takes two hops (or is corrected a moment later) reports once.
+  property int lastDesk: -1
+  readonly property bool popupVertical:
+    animation === "slidevert" || animation === "slidefadevert"
+
+  onDeskChanged: settleTimer.restart()
+  Component.onCompleted: settleTimer.restart()
+
+  Timer {
+    id: settleTimer
+    interval: 80
+    onTriggered: {
+      // Hyprland is not up yet right after a shell restart.
+      if (Hyprland.focusedWorkspace === null) { restart(); return }
+      var previous = root.lastDesk
+      root.lastDesk = root.desk
+      if (previous < 1 || previous === root.desk) return
+      if (popupLoader.item) popupLoader.item.show(previous, root.desk, root.direction(previous, root.desk))
+    }
+  }
+
+  // Which way a switch moved. Stepping forward past the last desktop wraps to
+  // the first, which still reads as "next"; with two desktops, or a jump by
+  // number, it is simply lower to higher.
+  function direction(from, to) {
+    var n = root.deskCount
+    if (n > 2) {
+      var forward = (to - from + n) % n
+      if (forward === 1) return 1
+      if (forward === n - 1) return -1
+    }
+    return to > from ? 1 : -1
+  }
+
+  Loader {
+    id: popupLoader
+    active: root.popupOn && root.configured
+    sourceComponent: DesktopPopup {
+      screen: root.QsWindow.window ? root.QsWindow.window.screen : null
+      count: root.deskCount
+      labels: root.popupLabels
+      vertical: root.popupVertical
+    }
+  }
+
   function showDesk(index) {
     if (!root.bar) return
     root.bar.run("hyprctl dispatch " + Util.shellQuote("tandem_show(" + index + ")"))

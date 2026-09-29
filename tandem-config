@@ -14,8 +14,9 @@
 #       labels (JSON array of names, or null for the D1..Dn default),
 #       separator (bool; draw a | between entries),
 #       density (compact|normal|comfortable), fontSize (small|normal|large):
-#       showMonitors, showKeys (bools; the panel's MONITORS and KEYS sections):
-#       the settings panel's own look, saved without touching Hyprland.
+#       showMonitors, showKeys (bools; the panel's MONITORS and KEYS sections),
+#       popup (bool; the on-screen pager shown after a switch):
+#       display settings, saved without touching Hyprland.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,6 +55,7 @@ get)
       fontSize: (if has("fontSize") and .fontSize != null then .fontSize else "normal" end),
       showMonitors: (if has("showMonitors") and .showMonitors != null then .showMonitors else true end),
       showKeys: (if has("showKeys") and .showKeys != null then .showKeys else true end),
+      popup:    (if has("popup") and .popup != null then .popup else false end),
       monitors: (if has("monitors") and .monitors != null then .monitors else null end),
       labels:   (if has("labels")   and .labels   != null then .labels   else null end),
       detected: $monitors,
@@ -72,7 +74,7 @@ set | set-json)
       || { echo "tandem-config: desktops must be 1-10" >&2; return 1; }
     json=$value
     ;;
-  numbers | tab | scroll | separator | showMonitors | showKeys)
+  numbers | tab | scroll | separator | showMonitors | showKeys | popup)
     [[ $value == true || $value == false ]] \
       || { echo "tandem-config: $key must be true or false" >&2; return 1; }
     json=$value
@@ -156,9 +158,10 @@ set | set-json)
     "$SHELL_JSON" >"$tmp"
   mv "$tmp" "$SHELL_JSON"
 
-  # Density, font size and the section switches belong to the settings panel, which keeps its own
-  # copy and re-reads it through `get`, so nothing needs reloading.
-  if [[ $(jq -r 'keys - ["density", "fontSize", "showMonitors", "showKeys"] | length' <<<"$patch") == 0 ]]; then
+  # Density, font size, the section switches and the popup are display
+  # settings: the panel and the indicator read them live, so nothing needs
+  # reloading.
+  if [[ $(jq -r 'keys - ["density", "fontSize", "showMonitors", "showKeys", "popup"] | length' <<<"$patch") == 0 ]]; then
     exit 0
   fi
 
