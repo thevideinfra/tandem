@@ -116,6 +116,24 @@ from the script its button runs.
 destination as the same directory: skip the copy, and never wipe the
 destination first, or it deletes itself mid-run.
 
+**Read live settings from `shell.json` with a watched `FileView`.** The bar
+injects a widget's settings only when it rebuilds the widget, so an injected
+value goes stale the moment the panel changes it. The desktop popup needs the
+animation style and its own on/off switch live, so `Indicator.qml` watches
+`~/.config/omarchy/shell.json` the way the shell does (`watchChanges: true`,
+`reload()` in `onFileChanged`) and reads the entry itself.
+
+**A bar widget can own an overlay window.** One `PanelWindow` per bar
+instance, with `screen` taken from `QsWindow.window.screen`, gives one popup
+per monitor. `WlrLayer.Overlay`, `keyboardFocus: None` and an empty `mask:
+Region {}` make it visual-only. It needs no manifest kind; plugin QML is not
+sandboxed.
+
+**Panel width has to follow the text, not just the spacing.** `Style.space`
+scales with the shell's base size but text does not scale the same way, so a
+width picked in spacing units truncates labels under another theme. Measure
+the longest label with `TextMetrics` and add `verticalContentInset`.
+
 **One plugin can supply two bar widgets.** A manifest declares a single
 `barWidget` entry point, but `allowMultiple: true` lets the same id appear
 twice in `shell.json`, and each entry's own keys reach the widget as

@@ -93,6 +93,11 @@ The ⚙ in the panel header opens its settings:
   keys sections. These save as you click.
 - A switch per key option — `SUPER+1..n`, `SUPER+TAB`, `SUPER+scroll` — and
   one for the `|` separator. Click anywhere on the row.
+- A **pager popup** switch, off by default: a small card in the middle of
+  each screen after a desktop switch. It has one square per desktop, named as
+  in the bar, with the current one marked and an arrow towards where you
+  went. It follows the animation — sideways for `slide`, up and down for
+  `slidevert`. It saves as you click.
 - The switching animation.
 - Re-run setup wizard.
 
@@ -128,6 +133,7 @@ BarWidget.qml     entry point; picks a role from its bar entry
 Indicator.qml     the D1/D2 indicator
 Settings.qml      the settings panel
 TandemIcon.qml    the two-monitor bar icon
+DesktopPopup.qml  the pager popup shown after a switch
 body.lua          the logic, hand-maintained
 tandem-apply      generates tandem.lua from settings, installs the loader
 tandem-setup      gum wizard; writes settings, then calls tandem-apply
@@ -165,7 +171,8 @@ bar hands a widget every key on its entry except `id`:
   "density":  "normal",
   "fontSize": "normal",
   "showMonitors": true,
-  "showKeys": true }
+  "showKeys": true,
+  "popup": false }
 ```
 
 - `monitors` — omit to autodetect, ordered top-to-bottom then left-to-right.
@@ -186,6 +193,7 @@ bar hands a widget every key on its entry except `id`:
   `normal` or `comfortable`, and `small`, `normal` or `large`. They change
   nothing in Hyprland or the bar.
 - `showMonitors` / `showKeys` — show the panel's MONITORS and KEYS sections.
+- `popup` — show the pager popup after a desktop switch. Off by default.
 
 `labels` and `separator` are cosmetic, so changing only those skips the
 Hyprland regenerate-and-reload.
