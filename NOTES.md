@@ -145,6 +145,20 @@ with some application rather than nothing) and pass the entry's icon to
 `Hyprland.toplevels` carries each window's `workspace`, `title` and
 `wayland.appId`.
 
+**Bar clicks go to registered targets, not to the widget's own handlers.** The
+bar puts a `MouseArea` over every slot so widgets can be dragged to reorder,
+and on a click it calls `triggerPress(button)` on whichever *registered* click
+target is under the pointer (`bar.registerClickTarget`). A `TapHandler` or
+`MouseArea` inside the widget never sees the press. `WidgetButton` registers
+itself; anything else that wants clicks needs `triggerPress`, `interactive`
+and `registerClickTarget`/`unregisterClickTarget`, as the indicator boxes do.
+This was the bug when the boxes first used a `TapHandler`.
+
+**Testing a click without a click tool.** `/dev/uinput` is writable here, so a
+script can create a virtual mouse and press `BTN_LEFT`; park the cursor first
+with `hyprctl dispatch 'hl.dsp.cursor.move({ x = .., y = .. })'` (global
+coordinates).
+
 **A panel can open overlay windows on every screen.** `Variants` over
 `Quickshell.screens` with a `PanelWindow` per screen (overlay layer, no
 keyboard focus, empty `mask`) is how Identify names each monitor on itself.

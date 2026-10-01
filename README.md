@@ -97,14 +97,18 @@ everything else is a tint of the panel's own text colour.
   - The switch and send keys, as key caps. Click a row to change it: toggle the
     modifiers, then press the key. The send key follows the switch key until you
     set it to something else.
-  - Switches for `SUPER + 1..n`, `SUPER + TAB` and `SUPER + scroll`, and a
-    button that re-runs the setup wizard for the rest.
+  - Switches for `SUPER + 1..n`, `SUPER + TAB` and `SUPER + scroll`.
+  - **Mouse**: a switch for clicking a desktop in the bar to go to it, on by
+    default.
+  - A button that re-runs the setup wizard for the rest.
 - **Styling** —
   - **Density** (**Compact**, **Normal** or **Roomy**) and **font size**
     (**Small**, **Normal** or **Large**).
   - **Bar indicator**: **Boxes** (each desktop in a rounded box, the current one
-    filled with the accent) or **Text**, and a switch for a thin line after the
-    last desktop that sets it apart from the icons beside it.
+    filled with the accent) or **Text**; a switch for a thin accent-coloured
+    line after the last desktop, setting it apart from the icons beside it; and
+    a switch to **show open windows** — up to three app icons after each
+    desktop's name, then `+N`.
   - **Switch mode**: whether the monitors sit side by side or stacked, so a
     switch moves the way they are arranged.
   - **Transition**: slide, fade, slide and fade, or Hyprland's own.
@@ -118,8 +122,8 @@ Desktop, name, key, switch-mode and transition edits are **staged**. A banner
 appears above the tabs with how many are pending, and **Apply & reload** writes
 them: each write regenerates and reloads the Hyprland config, too disruptive
 to do per click. **Revert** discards them; so does closing the panel. Density,
-font size, the bar indicator and the popup only change how things look, so they
-save as you click.
+font size, the bar indicator, the click switch and the popup only change how
+things look or behave in the bar, so they save as you click.
 
 ## Updating
 
@@ -150,6 +154,7 @@ Indicator.qml     the desktop indicator in the bar (boxes or text)
 Settings.qml      the settings panel
 TandemIcon.qml    the two-monitor bar icon
 DesktopPopup.qml  the pager popup shown after a switch
+WindowIcons.qml   what is open on each desktop, and its app icons
 body.lua          the logic, hand-maintained
 tandem-apply      generates tandem.lua from settings, installs the loader
 tandem-setup      gum wizard; writes settings, then calls tandem-apply
@@ -188,6 +193,8 @@ bar hands a widget every key on its entry except `id`:
   "fontSize": "normal",
   "indicator": "boxes",
   "divider":  false,
+  "windowIcons": false,
+  "clickToSwitch": true,
   "popup": false }
 ```
 
@@ -217,8 +224,11 @@ bar hands a widget every key on its entry except `id`:
   `text`.
 - `divider` — draw a thin line after the last desktop in the bar. Off by
   default.
+- `windowIcons` — show app icons for the windows open on each desktop, in the
+  bar. Off by default.
+- `clickToSwitch` — clicking a desktop in the bar goes to it. On by default.
 
-`labels`, `mode`, `density`, `fontSize`, `popup`, `indicator` and `divider` are display settings that
+`labels`, `mode`, `density`, `fontSize`, `popup`, `indicator`, `divider`, `windowIcons` and `clickToSwitch` are display settings that
 the panel and the bar widget read live from `shell.json`, so changing only
 those skips the Hyprland regenerate-and-reload and needs no shell restart.
 
