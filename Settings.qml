@@ -691,12 +691,15 @@ Panel {
             anchors.verticalCenter: parent.verticalCenter
             spacing: root.sp(2)
 
-            Row {
+            // The name on the left; the version and the repository link on
+            // the right of the same line, so they stay clear of it.
+            Item {
               width: parent.width
-              spacing: root.sp(7)
+              implicitHeight: Math.max(titleText.implicitHeight, versionRow.implicitHeight)
 
               Text {
                 id: titleText
+                anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Tandem"
                 color: root.barForeground
@@ -704,6 +707,12 @@ Panel {
                 font.pixelSize: root.fontTitle
                 font.bold: true
               }
+
+              Row {
+                id: versionRow
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: root.sp(7)
 
               Rectangle {
                 visible: root.version !== ""
@@ -754,6 +763,7 @@ Panel {
                   text: "Open on GitHub"
                   fontFamily: Style.font.family
                 }
+              }
               }
             }
 
