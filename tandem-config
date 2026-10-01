@@ -17,9 +17,11 @@
 #       density (compact|normal|roomy), fontSize (small|normal|large),
 #       popup (bool; the on-screen pager shown after a switch),
 #       indicator (boxes|text; how the bar shows the desktops),
-#       divider (bool; a thin line after the last desktop in the bar).
+#       divider (bool; a thin line after the last desktop in the bar),
+#       windowIcons (bool; app icons for what is open, in the bar),
+#       clickToSwitch (bool; clicking a desktop in the bar goes to it).
 #
-# labels, density, fontSize, mode, popup, indicator and divider are display settings: the panel and
+# labels, density, fontSize, mode, popup, indicator, divider, windowIcons and clickToSwitch are display settings: the panel and
 # the bar widget read them live from shell.json, so changing only those never
 # touches Hyprland.
 set -euo pipefail
@@ -62,6 +64,8 @@ get)
       popup:    (if has("popup") and .popup != null then .popup else false end),
       indicator: (if has("indicator") and .indicator != null then .indicator else "boxes" end),
       divider:  (if has("divider") and .divider != null then .divider else false end),
+      windowIcons: (if has("windowIcons") and .windowIcons != null then .windowIcons else false end),
+      clickToSwitch: (if has("clickToSwitch") and .clickToSwitch != null then .clickToSwitch else true end),
       monitors: (if has("monitors") and .monitors != null then .monitors else null end),
       labels:   (if has("labels")   and .labels   != null then .labels   else null end),
       detected: $monitors,
@@ -81,7 +85,7 @@ set | set-json)
       || { echo "tandem-config: desktops must be 1-10" >&2; return 1; }
     json=$value
     ;;
-  numbers | tab | scroll | popup | divider)
+  numbers | tab | scroll | popup | divider | windowIcons | clickToSwitch)
     [[ $value == true || $value == false ]] \
       || { echo "tandem-config: $key must be true or false" >&2; return 1; }
     json=$value
@@ -182,7 +186,7 @@ set | set-json)
 
   # Display settings are read live by the panel and the bar widget, so there
   # is nothing to regenerate or reload.
-  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider"] | length' <<<"$patch") == 0 ]]; then
+  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider", "windowIcons", "clickToSwitch"] | length' <<<"$patch") == 0 ]]; then
     echo "tandem-config: appearance updated"
     exit 0
   fi

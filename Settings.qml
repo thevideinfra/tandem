@@ -219,6 +219,8 @@ Panel {
   property bool popup: false
   property string indicator: "boxes"
   property bool divider: false
+  property bool windowIcons: false
+  property bool clickToSwitch: true
   readonly property real densityScale:
     density === "compact" ? 0.61 : (density === "roomy" ? 0.83 : 0.71)
   // Text shrinks half as fast as spacing so compact stays readable, then the
@@ -315,48 +317,20 @@ Panel {
     return out
   }
 
-  // The windows open on a desktop, across its workspaces: { appId, title }.
-  function windowsOfDesk(desk) {
-    var ids = workspacesOf(desk)
-    var out = []
-    var list = Hyprland.toplevels ? Hyprland.toplevels.values : []
-    for (var i = 0; i < list.length; i++) {
-      var t = list[i]
-      if (!t || !t.workspace || ids.indexOf(t.workspace.id) < 0) continue
-      var ipc = t.lastIpcObject || {}
-      out.push({
-        appId: String(t.wayland && t.wayland.appId ? t.wayland.appId : (ipc["class"] || "")),
-        title: String(t.title || "")
-      })
-    }
-    return out
+  WindowIcons {
+    id: windowData
+    monitorCount: Math.max(1, root.monitorNames.length || root.monitorCount)
+    appLibrary: root.bar && root.bar.shell ? root.bar.shell.appLibrary : null
   }
+
+  function windowsOfDesk(desk) { return windowData.windowsOfDesk(desk) }
 
   // "WS 1, 2": the workspaces a desktop owns, one per monitor.
   function workspaceText(desk) {
     return "WS " + workspacesOf(desk).join(", ")
   }
 
-  // The app's icon, through its desktop entry where there is one: a window
-  // class such as "brave-origin" is not an icon name by itself. Falls back to
-  // the class as an icon name, then to the shell's generic icon.
-  readonly property var appLibrary: root.bar && root.bar.shell ? root.bar.shell.appLibrary : null
-
-  function iconFor(appId) {
-    var id = String(appId || "")
-    var name = id
-    try {
-      var entry = DesktopEntries.byId(id)
-      if (!entry) {
-        var guess = DesktopEntries.heuristicLookup(id)
-        var a = id.toLowerCase(), b = guess ? String(guess.id || "").toLowerCase() : ""
-        if (guess && b !== "" && (a === b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1)) entry = guess
-      }
-      if (entry && entry.icon) name = String(entry.icon)
-    } catch (e) { }
-    if (root.appLibrary) return root.appLibrary.iconSource(name)
-    return Quickshell.iconPath(name, true)
-  }
+  function iconFor(appId) { return windowData.iconFor(appId) }
 
   // Which workspace a monitor shows on the desktop you are on.
   function workspaceOnMonitor(name) {
@@ -501,6 +475,8 @@ Panel {
       popup = data.popup === true
       indicator = data.indicator === "text" ? "text" : "boxes"
       divider = data.divider === true
+      windowIcons = data.windowIcons === true
+      clickToSwitch = data.clickToSwitch !== false
       detected = data.detected || []
       monitorNames = data.monitors || detected.map(function(m) { return m.name })
       savedLabels = normalizeLabels(data.labels, data.desktops)
@@ -1439,6 +1415,16 @@ Panel {
     }
 
     PanelSeparator { foreground: root.barForeground }
+    SectionLabel { icon: "\uf245"; text: "MOUSE" }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Click a desktop to go to it"
+      checked: root.clickToSwitch
+      onToggled: root.setDisplay("clickToSwitch", !root.clickToSwitch)
+    }
+
+    PanelSeparator { foreground: root.barForeground }
 
     Rectangle {
       width: parent.width
@@ -1532,6 +1518,13 @@ Panel {
       label: "Line after the indicator"
       checked: root.divider
       onToggled: root.setDisplay("divider", !root.divider)
+    }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Show open windows"
+      checked: root.windowIcons
+      onToggled: root.setDisplay("windowIcons", !root.windowIcons)
     }
 
     PanelSeparator { foreground: root.barForeground }

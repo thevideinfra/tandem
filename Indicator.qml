@@ -48,6 +48,10 @@ BarWidget {
   property string indicatorStyle: "boxes"
   // A thin line after the last desktop, setting them apart from what follows.
   property bool divider: false
+  // Small app icons after each desktop's name, for what is open on it.
+  property bool windowIcons: false
+  // Clicking a desktop in the bar goes to it. On unless switched off.
+  property bool clickToSwitch: true
 
   FileView {
     id: liveConfig
@@ -74,6 +78,8 @@ BarWidget {
             root.mode = e.mode || ""
             root.indicatorStyle = e.indicator === "text" ? "text" : "boxes"
             root.divider = e.divider === true
+            root.windowIcons = e.windowIcons === true
+            root.clickToSwitch = e.clickToSwitch !== false
             return
           }
         }
@@ -130,6 +136,17 @@ BarWidget {
     }
   }
 
+  WindowIcons {
+    id: windowData
+    monitorCount: root.monitorCount
+    appLibrary: root.bar && root.bar.shell ? root.bar.shell.appLibrary : null
+  }
+
+  // How many app icons one desktop shows before "+N". Not on a vertical bar,
+  // where there is no room beside the name.
+  readonly property int maxIcons: 3
+  readonly property bool showIcons: root.windowIcons && !root.vertical
+
   function showDesk(index) {
     if (!root.bar) return
     root.bar.run("hyprctl dispatch " + Util.shellQuote("tandem_show(" + index + ")"))
@@ -183,7 +200,7 @@ BarWidget {
 
   // Boxes are a little shorter than the bar so the strip around them reads as
   // the bar's own padding.
-  readonly property int boxHeight: Math.round(root.barSize * 0.72)
+  readonly property int boxHeight: Math.round(root.barSize * 0.9)
 
   // Room taken by the divider line, margins included.
   readonly property real dividerSlot: root.divider ? Style.space(11) : 0
@@ -250,7 +267,7 @@ BarWidget {
         Layout.preferredHeight: root.boxHeight
         Layout.preferredWidth: root.vertical
           ? Math.max(root.boxHeight, Math.round(root.barSize * 0.8))
-          : Math.max(root.boxHeight, boxText.implicitWidth + Style.space(14))
+          : Math.max(root.boxHeight, boxContent.implicitWidth + Style.space(3))
         radius: Style.space(5)
         color: current ? Color.accent
           : Util.alpha(root.bar ? root.bar.barForeground : Color.foreground, hover.hovered ? 0.18 : 0.09)
@@ -258,20 +275,58 @@ BarWidget {
         border.color: Util.alpha(root.bar ? root.bar.barForeground : Color.foreground, 0.12)
         Behavior on color { ColorAnimation { duration: 120 } }
 
-        Text {
-          id: boxText
+        Row {
+          id: boxContent
           anchors.centerIn: parent
-          textFormat: Text.PlainText
-          text: root.labelFor(box.modelData)
-          color: box.current ? root.onAccent : (root.bar ? root.bar.barForeground : Color.foreground)
-          opacity: box.current ? 1 : 0.7
-          font.family: Style.font.family
-          font.pixelSize: Math.min(Style.font.body, Math.round(root.boxHeight * 0.52))
-          font.bold: box.current
+          spacing: Style.space(3)
+
+          Text {
+            id: boxText
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: root.labelFor(box.modelData)
+            color: box.current ? root.onAccent : (root.bar ? root.bar.barForeground : Color.foreground)
+            opacity: box.current ? 1 : 0.7
+            font.family: Style.font.family
+            font.pixelSize: Math.min(Style.font.body, Math.round(root.boxHeight * 0.62))
+            font.bold: box.current
+          }
+
+          WindowIconRow {
+            anchors.verticalCenter: parent.verticalCenter
+            desk: box.modelData
+            textColor: box.current ? root.onAccent : (root.bar ? root.bar.barForeground : Color.foreground)
+          }
         }
 
-        HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
-        TapHandler { onTapped: root.showDesk(box.modelData) }
+        HoverHandler { id: hover; cursorShape: root.clickToSwitch ? Qt.PointingHandCursor : Qt.ArrowCursor }
+
+        // The bar owns the mouse over its slots (it needs it to drag widgets
+        // about) and hands a click to whichever registered target is under
+        // the pointer, calling triggerPress on it. A box that only listens
+        // for taps itself never sees the click, so it registers like
+        // WidgetButton does.
+        readonly property bool interactive: root.clickToSwitch
+        property var registeredBar: null
+
+        function triggerPress(button) {
+          if (button === Qt.LeftButton) root.showDesk(box.modelData)
+        }
+
+        function syncRegistration() {
+          if (registeredBar && registeredBar.unregisterClickTarget) registeredBar.unregisterClickTarget(box)
+          registeredBar = root.bar
+          if (registeredBar && registeredBar.registerClickTarget) registeredBar.registerClickTarget(box)
+        }
+
+        Connections {
+          target: root
+          function onBarChanged() { box.syncRegistration() }
+        }
+        Component.onCompleted: syncRegistration()
+        Component.onDestruction: {
+          if (registeredBar && registeredBar.unregisterClickTarget) registeredBar.unregisterClickTarget(box)
+        }
       }
     }
   }
@@ -292,37 +347,89 @@ BarWidget {
     Repeater {
       model: root.desks()
 
+      RowLayout {
+        id: textCell
+        required property int modelData
+        spacing: 0
+
       WidgetButton {
         id: textButton
-        required property int modelData
         bar: root.bar
-        text: root.labelFor(modelData)
+        text: root.labelFor(textCell.modelData)
         // Distinguish the current desktop by hue, not just brightness.
         // WidgetButton's activeColor defaults to bar.active, which no stock
         // theme defines -- it falls through to Quickshell's hardcoded urgent
         // red rather than anything in the palette. accent is set by all 22
         // stock themes, so that is the one that actually tracks the theme.
-        active: root.desk === modelData
+        active: root.desk === textCell.modelData
         activeColor: Color.accent
-        opacity: root.desk === modelData ? 1 : 0.55
+        opacity: root.desk === textCell.modelData ? 1 : 0.55
         horizontalMargin: 6
         verticalPadding: 6
         fixedWidth: root.vertical ? root.barSize : -1
         fixedHeight: root.barSize
-        onPressed: function() { root.showDesk(modelData) }
+        interactive: root.clickToSwitch
+        onPressed: function() { root.showDesk(textCell.modelData) }
+      }
+
+      WindowIconRow {
+        Layout.alignment: Qt.AlignVCenter
+        desk: textCell.modelData
+        textColor: root.bar ? root.bar.barForeground : Color.foreground
+        opacity: root.desk === textCell.modelData ? 1 : 0.55
+      }
       }
     }
   }
 
+  // The app icons for one desktop, then "+N" for any beyond the limit.
+  component WindowIconRow: Row {
+    id: iconRow
+    property int desk: 1
+    property color textColor: "white"
+    readonly property var apps: root.showIcons ? windowData.appsOfDesk(desk) : []
+    readonly property int shown: Math.min(apps.length, root.maxIcons)
+    readonly property int iconSize: Math.round(root.boxHeight * 0.72)
+
+    visible: apps.length > 0
+    spacing: Style.space(2)
+
+    Repeater {
+      model: iconRow.apps.slice(0, iconRow.shown)
+
+      Image {
+        required property var modelData
+        anchors.verticalCenter: parent.verticalCenter
+        width: iconRow.iconSize
+        height: iconRow.iconSize
+        sourceSize: Qt.size(width * 2, height * 2)
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        source: windowData.iconFor(modelData.appId)
+      }
+    }
+
+    Text {
+      visible: iconRow.apps.length > iconRow.shown
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: "+" + (iconRow.apps.length - iconRow.shown)
+      color: iconRow.textColor
+      opacity: 0.7
+      font.family: Style.font.family
+      font.pixelSize: Math.round(root.boxHeight * 0.45)
+    }
+  }
+
   // ---- Divider ----
-  // A thin line after the last desktop, in a tint of the bar foreground.
+  // A thin line after the last desktop, in the theme accent.
   Rectangle {
     visible: root.configured && root.divider
     readonly property real thickness: Math.max(1, Style.space(1))
     width: root.vertical ? Math.round(root.barSize * 0.5) : thickness
     height: root.vertical ? thickness : Math.round(root.barSize * 0.55)
     radius: thickness / 2
-    color: Util.alpha(root.bar ? root.bar.barForeground : Color.foreground, 0.35)
+    color: Util.alpha(Color.accent, 0.8)
     anchors.right: root.vertical ? undefined : parent.right
     anchors.rightMargin: Style.space(5)
     anchors.verticalCenter: root.vertical ? undefined : parent.verticalCenter
