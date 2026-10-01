@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
 
@@ -38,6 +39,7 @@ Panel {
   property string animation: "slide"
   property string savedMode: ""
   property var detected: []
+  property var monitorNames: []   // the order tandem uses: configured, else detected
   property var savedLabels: []   // normalized from disk, one per desktop
   property var pLabels: []       // staged edits
   property var labelSlots: []    // drives the Repeater; reassigned to rebuild it
@@ -305,6 +307,119 @@ Panel {
     return ""
   }
 
+  // Workspace numbers a desktop owns, one per monitor: "1 \u00b7 2".
+  function workspacesOf(desk) {
+    var out = []
+    var count = Math.max(1, monitorNames.length || monitorCount)
+    for (var i = 1; i <= count; i++) out.push((desk - 1) * count + i)
+    return out
+  }
+
+  // Windows open on a desktop, summed over its workspaces.
+  function windowsOn(desk) {
+    var ids = workspacesOf(desk)
+    var total = 0
+    var list = Hyprland.workspaces.values
+    for (var i = 0; i < list.length; i++) {
+      var w = list[i]
+      if (ids.indexOf(w.id) >= 0 && w.toplevels) total += w.toplevels.values.length
+    }
+    return total
+  }
+
+  // "Workspaces 1, 2" on the left of a desktop row, "2 windows" on the right.
+  function workspaceText(desk) {
+    var ids = workspacesOf(desk)
+    return (ids.length === 1 ? "Workspace " : "Workspaces ") + ids.join(", ")
+  }
+
+  function windowText(desk) {
+    var n = windowsOn(desk)
+    return n === 0 ? "No windows" : n + (n === 1 ? " window" : " windows")
+  }
+
+  // Which workspace a monitor shows on the desktop you are on.
+  function workspaceOnMonitor(name) {
+    var at = monitorNames.indexOf(name)
+    return at < 0 ? 0 : workspacesOf(currentDesk)[at]
+  }
+
+  function positionByName(name) {
+    for (var i = 0; i < detected.length; i++)
+      if (detected[i].name === name) return monitorPosition(i)
+    return ""
+  }
+
+  // ---- Identify: name every screen on itself for a moment ----
+  property bool identifying: false
+
+  function identify() {
+    identifying = true
+    identifyTimer.restart()
+  }
+
+  Timer {
+    id: identifyTimer
+    interval: 2500
+    onTriggered: root.identifying = false
+  }
+
+  Variants {
+    model: Quickshell.screens
+
+    PanelWindow {
+      id: identifyWindow
+      required property var modelData
+      screen: modelData
+      visible: root.identifying
+      implicitWidth: identifyCard.width
+      implicitHeight: identifyCard.height
+      color: "transparent"
+      WlrLayershell.namespace: "tandem-identify"
+      WlrLayershell.layer: WlrLayer.Overlay
+      WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+      exclusionMode: ExclusionMode.Ignore
+      mask: Region {}
+
+      BorderSurface {
+        id: identifyCard
+        width: borderLeft + borderRight + identifyColumn.implicitWidth + Style.space(48)
+        height: borderTop + borderBottom + identifyColumn.implicitHeight + Style.space(32)
+        color: Util.alpha(Color.background, 0.97)
+        borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
+        radius: Style.cornerRadius
+
+        Column {
+          id: identifyColumn
+          anchors.centerIn: parent
+          spacing: Style.space(4)
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            textFormat: Text.PlainText
+            text: identifyWindow.modelData.name
+            color: Color.accent
+            font.family: Style.font.family
+            font.pixelSize: Style.font.displayLarge
+            font.bold: true
+          }
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            textFormat: Text.PlainText
+            readonly property string place: root.positionByName(identifyWindow.modelData.name)
+            readonly property int ws: root.workspaceOnMonitor(identifyWindow.modelData.name)
+            text: (place !== "" ? place + " \u00b7 " : "") + (ws > 0 ? "workspace " + ws : "")
+            color: Color.popups.text
+            opacity: 0.75
+            font.family: Style.font.family
+            font.pixelSize: Style.font.title
+          }
+        }
+      }
+    }
+  }
+
   readonly property bool labelsDirty:
     JSON.stringify(pLabels) !== JSON.stringify(savedLabels)
 
@@ -367,6 +482,7 @@ Panel {
       indicator = data.indicator === "text" ? "text" : "boxes"
       divider = data.divider === true
       detected = data.detected || []
+      monitorNames = data.monitors || detected.map(function(m) { return m.name })
       savedLabels = normalizeLabels(data.labels, data.desktops)
       revert()
     } catch (e) {
@@ -909,7 +1025,7 @@ Panel {
           required property var modelData
           readonly property bool current: modelData.i + 1 === root.currentDesk
           width: parent.width
-          implicitHeight: nameField.implicitHeight + root.sp(10)
+          implicitHeight: nameField.implicitHeight + infoText.implicitHeight + root.sp(14)
           radius: root.sp(7)
           color: current ? Util.alpha(Color.accent, 0.12) : root.tint(0.05)
           border.width: 1
@@ -1000,7 +1116,8 @@ Panel {
             anchors.leftMargin: root.sp(6)
             anchors.right: rowAction.left
             anchors.rightMargin: root.sp(6)
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.top: parent.top
+            anchors.topMargin: root.sp(5)
             placeholderText: root.defaultLabel(deskRow.modelData.i)
             foreground: root.barForeground
             font.family: Style.font.family
@@ -1015,6 +1132,35 @@ Panel {
             onActiveFocusChanged: root.editing = activeFocus
             Keys.onEscapePressed: keyCatcher.forceActiveFocus()
           }
+
+          Text {
+            id: infoText
+            anchors.left: nameField.left
+            anchors.leftMargin: root.sp(2)
+            anchors.top: nameField.bottom
+            anchors.topMargin: root.sp(2)
+            textFormat: Text.PlainText
+            text: root.workspaceText(deskRow.modelData.i + 1)
+            color: root.barForeground
+            opacity: 0.5
+            font.family: Style.font.family
+            font.pixelSize: root.fontCaption
+          }
+
+          // Window count on the right, so it reads as its own fact. Accent
+          // when the desktop has windows in it.
+          Text {
+            readonly property int count: root.windowsOn(deskRow.modelData.i + 1)
+            anchors.right: nameField.right
+            anchors.rightMargin: root.sp(2)
+            anchors.baseline: infoText.baseline
+            textFormat: Text.PlainText
+            text: root.windowText(deskRow.modelData.i + 1)
+            color: count > 0 ? Color.accent : root.barForeground
+            opacity: count > 0 ? 0.85 : 0.5
+            font.family: Style.font.family
+            font.pixelSize: root.fontCaption
+          }
         }
       }
     }
@@ -1022,7 +1168,52 @@ Panel {
     Caption { width: parent.width; text: "Blank falls back to D1..D" + root.pDesktops + "." }
 
     PanelSeparator { foreground: root.barForeground }
-    SectionLabel { icon: ""; text: "MONITORS" }
+    Item {
+      width: parent.width
+      implicitHeight: Math.max(monitorsLabel.implicitHeight, identifyButton.implicitHeight)
+
+      SectionLabel { id: monitorsLabel; icon: ""; text: "MONITORS"; anchors.verticalCenter: parent.verticalCenter }
+
+      Rectangle {
+        id: identifyButton
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        implicitWidth: identifyText.implicitWidth + root.sp(16)
+        implicitHeight: identifyText.implicitHeight + root.sp(8)
+        width: implicitWidth
+        height: implicitHeight
+        radius: root.sp(5)
+        color: identifyMouse.containsMouse ? Util.alpha(Color.accent, 0.18) : "transparent"
+        border.width: 1
+        border.color: identifyMouse.containsMouse ? Color.accent : root.tint(0.25)
+
+        Text {
+          id: identifyText
+          anchors.centerIn: parent
+          textFormat: Text.PlainText
+          text: "Identify"
+          color: identifyMouse.containsMouse ? Color.accent : root.barForeground
+          font.family: Style.font.family
+          font.pixelSize: root.fontCaption
+        }
+
+        MouseArea {
+          id: identifyMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.identify()
+        }
+
+        PanelToolTip {
+          visible: identifyMouse.containsMouse
+          text: "Show each monitor's name on its screen"
+          fontFamily: Style.font.family
+        }
+      }
+    }
+
+    MonitorMap { width: parent.width }
 
     Column {
       width: parent.width
@@ -1090,6 +1281,83 @@ Panel {
             opacity: 0.7
             font.family: Style.font.family
             font.pixelSize: root.fontSmall
+          }
+        }
+      }
+    }
+  }
+
+  // The monitors to scale, as they sit on the desk, each with the workspace
+  // it shows on the desktop you are on. The one with focus is outlined.
+  component MonitorMap: Rectangle {
+    id: map
+    readonly property var mons: root.detected
+    readonly property int pad: root.sp(8)
+
+    height: root.sp(112)
+    radius: root.sp(7)
+    color: root.tint(0.03)
+    border.width: 1
+    border.color: root.tint(0.1)
+    visible: mons.length > 0
+
+    readonly property var frame: {
+      var list = map.mons
+      if (!list || list.length === 0) return { scale: 1, ox: 0, oy: 0, x0: 0, y0: 0 }
+      var x0 = list[0].x, y0 = list[0].y, x1 = x0, y1 = y0
+      for (var i = 0; i < list.length; i++) {
+        x0 = Math.min(x0, list[i].x); y0 = Math.min(y0, list[i].y)
+        x1 = Math.max(x1, list[i].x + list[i].width); y1 = Math.max(y1, list[i].y + list[i].height)
+      }
+      var scale = Math.min((map.width - 2 * map.pad) / (x1 - x0), (map.height - 2 * map.pad) / (y1 - y0))
+      return {
+        scale: scale, x0: x0, y0: y0,
+        ox: (map.width - (x1 - x0) * scale) / 2,
+        oy: (map.height - (y1 - y0) * scale) / 2
+      }
+    }
+
+    Repeater {
+      model: map.mons
+
+      Rectangle {
+        id: tile
+        required property var modelData
+        readonly property bool focused: Hyprland.focusedMonitor !== null
+          && Hyprland.focusedMonitor.name === modelData.name
+        readonly property int ws: root.workspaceOnMonitor(modelData.name)
+        x: map.frame.ox + (modelData.x - map.frame.x0) * map.frame.scale + 1
+        y: map.frame.oy + (modelData.y - map.frame.y0) * map.frame.scale + 1
+        width: modelData.width * map.frame.scale - 2
+        height: modelData.height * map.frame.scale - 2
+        radius: root.sp(4)
+        color: focused ? Util.alpha(Color.accent, 0.14) : root.tint(0.07)
+        border.width: focused ? 2 : 1
+        border.color: focused ? Color.accent : root.tint(0.3)
+
+        Column {
+          anchors.centerIn: parent
+          spacing: root.sp(1)
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            textFormat: Text.PlainText
+            text: tile.modelData.name
+            color: tile.focused ? Color.accent : root.barForeground
+            font.family: Style.font.family
+            font.pixelSize: root.fontSmall
+            font.bold: true
+          }
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: tile.ws > 0
+            textFormat: Text.PlainText
+            text: "ws " + tile.ws
+            color: root.barForeground
+            opacity: 0.6
+            font.family: Style.font.family
+            font.pixelSize: root.fontCaption
           }
         }
       }
