@@ -12,11 +12,16 @@
 #
 # Keys: desktops (1-10), toggle, send (key specs), numbers, tab, scroll (bools),
 #       labels (JSON array of names, or null for the D1..Dn default),
-#       separator (bool; draw a | between entries),
-#       density (compact|normal|comfortable), fontSize (small|normal|large):
-#       showMonitors, showKeys (bools; the panel's MONITORS and KEYS sections),
-#       popup (bool; the on-screen pager shown after a switch):
-#       display settings, saved without touching Hyprland.
+#       animation (the Hyprland workspace style), mode (horizontal|vertical: the
+#       way the monitors are arranged, which the popup follows),
+#       density (compact|normal|roomy), fontSize (small|normal|large),
+#       popup (bool; the on-screen pager shown after a switch),
+#       indicator (boxes|text; how the bar shows the desktops),
+#       divider (bool; a thin line after the last desktop in the bar).
+#
+# labels, density, fontSize, mode, popup, indicator and divider are display settings: the panel and
+# the bar widget read them live from shell.json, so changing only those never
+# touches Hyprland.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,7 +46,8 @@ get)
   monitors=$(hyprctl monitors -j 2>/dev/null \
     | jq -c 'sort_by(.y, .x) | [.[] | {name, width, height, x, y}]' 2>/dev/null || echo '[]')
   # Fill defaults so the panel never has to know them.
-  settings | jq -c --argjson monitors "$monitors" --argjson configured "$configured" '
+  version=$(jq -r '.version // ""' "$HERE/manifest.json" 2>/dev/null || true)
+  settings | jq -c --argjson monitors "$monitors" --argjson configured "$configured" --arg version "$version" '
     {
       desktops: (if has("desktops") and .desktops != null then .desktops else 2 end),
       toggle:   (if has("toggle")   and .toggle   != null then .toggle   else "SUPER + F" end),
@@ -49,17 +55,18 @@ get)
       numbers:  (if has("numbers")  and .numbers  != null then .numbers  else true end),
       tab:      (if has("tab")      and .tab      != null then .tab      else true end),
       scroll:   (if has("scroll")   and .scroll   != null then .scroll   else true end),
-      separator:(if has("separator") and .separator!= null then .separator else false end),
       animation:(if has("animation") and .animation!= null then .animation else "slide" end),
-      density:  (if has("density")  and .density  != null then .density  else "normal" end),
+      density:  (if has("density") and .density != null then (if .density == "comfortable" then "roomy" else .density end) else "normal" end),
+      mode:     (if has("mode") and .mode != null then .mode else null end),
       fontSize: (if has("fontSize") and .fontSize != null then .fontSize else "normal" end),
-      showMonitors: (if has("showMonitors") and .showMonitors != null then .showMonitors else true end),
-      showKeys: (if has("showKeys") and .showKeys != null then .showKeys else true end),
       popup:    (if has("popup") and .popup != null then .popup else false end),
+      indicator: (if has("indicator") and .indicator != null then .indicator else "boxes" end),
+      divider:  (if has("divider") and .divider != null then .divider else false end),
       monitors: (if has("monitors") and .monitors != null then .monitors else null end),
       labels:   (if has("labels")   and .labels   != null then .labels   else null end),
       detected: $monitors,
-      configured: $configured
+      configured: $configured,
+      version: $version
     }'
   ;;
 
@@ -74,7 +81,7 @@ set | set-json)
       || { echo "tandem-config: desktops must be 1-10" >&2; return 1; }
     json=$value
     ;;
-  numbers | tab | scroll | separator | showMonitors | showKeys | popup)
+  numbers | tab | scroll | popup | divider)
     [[ $value == true || $value == false ]] \
       || { echo "tandem-config: $key must be true or false" >&2; return 1; }
     json=$value
@@ -99,8 +106,23 @@ set | set-json)
     ;;
   density)
     case "$value" in
-    compact | normal | comfortable) ;;
-    *) echo "tandem-config: density must be compact, normal or comfortable" >&2; return 1 ;;
+    compact | normal | roomy) ;;
+    comfortable) value=roomy ;;   # the old name
+    *) echo "tandem-config: density must be compact, normal or roomy" >&2; return 1 ;;
+    esac
+    json=$(jq -nc --arg v "$value" '$v')
+    ;;
+  indicator)
+    case "$value" in
+    boxes | text) ;;
+    *) echo "tandem-config: indicator must be boxes or text" >&2; return 1 ;;
+    esac
+    json=$(jq -nc --arg v "$value" '$v')
+    ;;
+  mode)
+    case "$value" in
+    horizontal | vertical) ;;
+    *) echo "tandem-config: mode must be horizontal or vertical" >&2; return 1 ;;
     esac
     json=$(jq -nc --arg v "$value" '$v')
     ;;
@@ -158,30 +180,9 @@ set | set-json)
     "$SHELL_JSON" >"$tmp"
   mv "$tmp" "$SHELL_JSON"
 
-  # Density, font size, the section switches and the popup are display
-  # settings: the panel and the indicator read them live, so nothing needs
-  # reloading.
-  if [[ $(jq -r 'keys - ["density", "fontSize", "showMonitors", "showKeys", "popup"] | length' <<<"$patch") == 0 ]]; then
-    exit 0
-  fi
-
-  # Labels only affect the bar widget, which reads shell.json directly. Skip
-  # the regenerate-and-reload when nothing the compositor cares about changed.
-  if [[ $(jq -r 'keys - ["labels", "separator"] | length' <<<"$patch") == 0 ]]; then
-    # Labels and the separator live only in injected settings, which the bar
-    # refreshes just when it rebuilds the widget, so the shell has to restart
-    # for the change to show.
-    #
-    # Detached, and after this script has exited. The settings panel runs this
-    # script as a child of the shell, so restarting the shell inline kills the
-    # whole process tree -- this script and the restart command with it. That
-    # race is why an applied name or separator used to flash and vanish, while
-    # the same change made alongside a desktop-count change stuck: that path
-    # reloads Hyprland instead and never restarts the shell.
-    if command -v omarchy >/dev/null; then
-      setsid sh -c 'sleep 0.5; omarchy restart shell' >/dev/null 2>&1 < /dev/null &
-      disown 2>/dev/null || true
-    fi
+  # Display settings are read live by the panel and the bar widget, so there
+  # is nothing to regenerate or reload.
+  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider"] | length' <<<"$patch") == 0 ]]; then
     echo "tandem-config: appearance updated"
     exit 0
   fi

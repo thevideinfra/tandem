@@ -42,6 +42,12 @@ BarWidget {
   property bool popupOn: false
   property string animation: "slide"
   property var popupLabels: []
+  property string mode: ""
+  // "boxes" draws each desktop in a rounded box, "text" is the plain labels
+  // with the current one in the accent colour.
+  property string indicatorStyle: "boxes"
+  // A thin line after the last desktop, setting them apart from what follows.
+  property bool divider: false
 
   FileView {
     id: liveConfig
@@ -63,7 +69,11 @@ BarWidget {
           if (e && e.id === "videinfra.tandem" && e.role !== "settings") {
             root.popupOn = e.popup === true
             root.animation = e.animation || "slide"
-            root.popupLabels = e.labels || []
+            root.liveLabels = e.labels || []
+            root.popupLabels = root.liveLabels
+            root.mode = e.mode || ""
+            root.indicatorStyle = e.indicator === "text" ? "text" : "boxes"
+            root.divider = e.divider === true
             return
           }
         }
@@ -74,8 +84,11 @@ BarWidget {
   // Desktop the popup last reported, and a short settle so a switch that
   // takes two hops (or is corrected a moment later) reports once.
   property int lastDesk: -1
-  readonly property bool popupVertical:
-    animation === "slidevert" || animation === "slidefadevert"
+  // The way the monitors are arranged. A saved mode wins; otherwise it comes
+  // from the animation style, which only the vertical styles name.
+  readonly property bool popupVertical: root.mode !== ""
+    ? root.mode === "vertical"
+    : (animation === "slidevert" || animation === "slidefadevert")
 
   onDeskChanged: settleTimer.restart()
   Component.onCompleted: settleTimer.restart()
@@ -123,22 +136,15 @@ BarWidget {
   }
 
   // Custom names if the user set any, else the D1..Dn default. A short list
-  // only names the desktops it covers; the rest keep their default.
+  // only names the desktops it covers; the rest keep their default. Read from
+  // the watched shell.json so a rename shows without a shell restart, falling
+  // back to the injected settings until the file has loaded.
+  property var liveLabels: null
+
   function labelFor(index) {
-    var names = settings && settings.labels
+    var names = root.liveLabels !== null ? root.liveLabels : (settings && settings.labels)
     if (names && index <= names.length && names[index - 1]) return names[index - 1]
     return "D" + index
-  }
-
-  // True once any desktop carries a custom name, which is when the tighter
-  // D1/D2 spacing stops being enough.
-  // Vertical bars stack the entries, where a "|" between rows reads wrong.
-  readonly property bool separatorVisible:
-    !root.vertical && !!(settings && settings.separator === true)
-
-  readonly property bool named: {
-    var names = settings && settings.labels
-    return !!(names && names.length > 0)
   }
 
   function desks() {
@@ -172,11 +178,39 @@ BarWidget {
     root.bar.run("omarchy-launch-tui " + root.pluginDir + "/tandem-setup")
   }
 
-  readonly property real trailingGap: root.vertical ? 0 : Style.spaceReal(1.5)
+  readonly property bool boxes: root.indicatorStyle === "boxes"
+  readonly property real trailingGap: root.vertical || root.boxes ? 0 : Style.spaceReal(1.5)
 
-  implicitWidth: root.configured ? grid.implicitWidth + trailingGap
-                                 : setupButton.implicitWidth
-  implicitHeight: root.configured ? grid.implicitHeight : setupButton.implicitHeight
+  // Boxes are a little shorter than the bar so the strip around them reads as
+  // the bar's own padding.
+  readonly property int boxHeight: Math.round(root.barSize * 0.72)
+
+  // Room taken by the divider line, margins included.
+  readonly property real dividerSlot: root.divider ? Style.space(11) : 0
+
+  // Text on the accent fill: black or white by the accent's luminance, so it
+  // stays readable whatever the theme's accent is.
+  readonly property color onAccent: {
+    var c = Color.accent
+    return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) > 0.5 ? "#101014" : "#ffffff"
+  }
+
+  readonly property bool named: {
+    var names = root.liveLabels !== null ? root.liveLabels : (settings && settings.labels)
+    return !!(names && names.length > 0)
+  }
+
+  readonly property real contentWidth: root.boxes ? boxGrid.implicitWidth : textGrid.implicitWidth + trailingGap
+  readonly property real contentHeight: root.boxes ? boxGrid.implicitHeight : textGrid.implicitHeight
+
+  // Fill the bar across its thickness, like the buttons beside it, so the
+  // boxes sit centred in it rather than at the top.
+  implicitWidth: root.configured
+    ? (root.vertical ? root.barSize : root.contentWidth + root.dividerSlot)
+    : setupButton.implicitWidth
+  implicitHeight: root.configured
+    ? (root.vertical ? root.contentHeight + root.dividerSlot : root.barSize)
+    : setupButton.implicitHeight
 
   WidgetButton {
     id: setupButton
@@ -189,11 +223,66 @@ BarWidget {
     onPressed: function() { root.runSetup() }
   }
 
+  // ---- Boxes ----
   GridLayout {
-    id: grid
-    visible: root.configured
+    id: boxGrid
+    visible: root.configured && root.boxes
     anchors.fill: parent
-    anchors.rightMargin: root.trailingGap
+    anchors.rightMargin: root.vertical ? 0 : root.dividerSlot
+    anchors.bottomMargin: root.vertical ? root.dividerSlot : 0
+    columns: root.vertical ? 1 : root.deskCount
+    columnSpacing: Style.space(3)
+    rowSpacing: Style.space(3)
+
+    Repeater {
+      model: root.desks()
+
+      // One rounded box per desktop; the current one is filled with the
+      // accent. accent is set by all 22 stock themes, so it is what tracks
+      // the theme (WidgetButton's own active colour falls through to a
+      // hardcoded urgent red).
+      Rectangle {
+        id: box
+        required property int modelData
+        readonly property bool current: root.desk === modelData
+
+        Layout.alignment: Qt.AlignCenter
+        Layout.preferredHeight: root.boxHeight
+        Layout.preferredWidth: root.vertical
+          ? Math.max(root.boxHeight, Math.round(root.barSize * 0.8))
+          : Math.max(root.boxHeight, boxText.implicitWidth + Style.space(14))
+        radius: Style.space(5)
+        color: current ? Color.accent
+          : Util.alpha(root.bar ? root.bar.barForeground : Color.foreground, hover.hovered ? 0.18 : 0.09)
+        border.width: current ? 0 : 1
+        border.color: Util.alpha(root.bar ? root.bar.barForeground : Color.foreground, 0.12)
+        Behavior on color { ColorAnimation { duration: 120 } }
+
+        Text {
+          id: boxText
+          anchors.centerIn: parent
+          textFormat: Text.PlainText
+          text: root.labelFor(box.modelData)
+          color: box.current ? root.onAccent : (root.bar ? root.bar.barForeground : Color.foreground)
+          opacity: box.current ? 1 : 0.7
+          font.family: Style.font.family
+          font.pixelSize: Math.min(Style.font.body, Math.round(root.boxHeight * 0.52))
+          font.bold: box.current
+        }
+
+        HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: root.showDesk(box.modelData) }
+      }
+    }
+  }
+
+  // ---- Text ----
+  GridLayout {
+    id: textGrid
+    visible: root.configured && !root.boxes
+    anchors.fill: parent
+    anchors.rightMargin: (root.vertical ? 0 : root.trailingGap + root.dividerSlot)
+    anchors.bottomMargin: root.vertical ? root.dividerSlot : 0
     columns: root.vertical ? 1 : root.deskCount
     // Word labels need more room between them than "D1 D2" does; a single
     // space reads as one run-on string once the names get long.
@@ -203,41 +292,41 @@ BarWidget {
     Repeater {
       model: root.desks()
 
-      RowLayout {
-        id: cell
+      WidgetButton {
+        id: textButton
         required property int modelData
-        spacing: root.separatorVisible ? Style.space(root.named ? 3 : 2) : 0
-
-        WidgetButton {
-          bar: root.bar
-          text: root.labelFor(cell.modelData)
-          // Distinguish the current desktop by hue, not just brightness.
-          // WidgetButton's activeColor defaults to bar.active, which no stock
-          // theme defines -- it falls through to Quickshell's hardcoded urgent
-          // red rather than anything in the palette. accent is set by all 22
-          // stock themes, so that is the one that actually tracks the theme.
-          active: root.desk === cell.modelData
-          activeColor: Color.accent
-          opacity: root.desk === cell.modelData ? 1 : 0.55
-          horizontalMargin: 6
-          verticalPadding: 6
-          fixedWidth: root.vertical ? root.barSize : -1
-          fixedHeight: root.barSize
-          onPressed: function() { root.showDesk(cell.modelData) }
-        }
-
-        // muted is a third role every stock theme defines, so the rule stays
-        // readable against both the accent-coloured active entry and the
-        // dimmed inactive ones.
-        Text {
-          visible: root.separatorVisible && cell.modelData < root.deskCount
-          text: "|"
-          color: Color.muted
-          font.family: Style.font.family
-          font.pixelSize: Style.font.body
-          Layout.alignment: Qt.AlignVCenter
-        }
+        bar: root.bar
+        text: root.labelFor(modelData)
+        // Distinguish the current desktop by hue, not just brightness.
+        // WidgetButton's activeColor defaults to bar.active, which no stock
+        // theme defines -- it falls through to Quickshell's hardcoded urgent
+        // red rather than anything in the palette. accent is set by all 22
+        // stock themes, so that is the one that actually tracks the theme.
+        active: root.desk === modelData
+        activeColor: Color.accent
+        opacity: root.desk === modelData ? 1 : 0.55
+        horizontalMargin: 6
+        verticalPadding: 6
+        fixedWidth: root.vertical ? root.barSize : -1
+        fixedHeight: root.barSize
+        onPressed: function() { root.showDesk(modelData) }
       }
     }
+  }
+
+  // ---- Divider ----
+  // A thin line after the last desktop, in a tint of the bar foreground.
+  Rectangle {
+    visible: root.configured && root.divider
+    readonly property real thickness: Math.max(1, Style.space(1))
+    width: root.vertical ? Math.round(root.barSize * 0.5) : thickness
+    height: root.vertical ? thickness : Math.round(root.barSize * 0.55)
+    radius: thickness / 2
+    color: Util.alpha(root.bar ? root.bar.barForeground : Color.foreground, 0.35)
+    anchors.right: root.vertical ? undefined : parent.right
+    anchors.rightMargin: Style.space(5)
+    anchors.verticalCenter: root.vertical ? undefined : parent.verticalCenter
+    anchors.bottom: root.vertical ? parent.bottom : undefined
+    anchors.horizontalCenter: root.vertical ? parent.horizontalCenter : undefined
   }
 }

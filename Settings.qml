@@ -5,15 +5,16 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Settings panel for videinfra.tandem. Every read and write goes through the
-// tandem-config script in the sibling plugin, so validation and file handling
-// live in one tested place instead of being reimplemented here.
+// Settings panel for videinfra.tandem, in three pages: Desktops, Keybinds and
+// Styling. Every read and write goes through the tandem-config script in the
+// sibling plugin, so validation and file handling live in one tested place
+// instead of being reimplemented here.
 //
-// Desktop, key and animation edits are staged locally and only written when
-// Apply is pressed: each write regenerates the Hyprland config and reloads it,
-// which is far too disruptive to do on every click while someone is still
-// deciding. Density and font size only change this panel, so they save as
-// soon as they are picked.
+// Desktop, name, key and transition edits are staged locally and only written
+// when Apply is pressed: each write regenerates the Hyprland config and
+// reloads it, which is far too disruptive to do on every click while someone
+// is still deciding. Density, font size and the popup only change how things
+// look, so they save as soon as they are picked.
 Panel {
   id: root
   moduleName: "videinfra.tandem"
@@ -31,10 +32,11 @@ Panel {
   property bool numbers: true
   property bool tabKeys: true
   property bool scrollKeys: true
-  property bool separator: false
   property string toggleKey: "SUPER + F"
   property string sendKey: "SUPER + SHIFT + F"
+  property string version: ""
   property string animation: "slide"
+  property string savedMode: ""
   property var detected: []
   property var savedLabels: []   // normalized from disk, one per desktop
   property var pLabels: []       // staged edits
@@ -45,32 +47,178 @@ Panel {
   property bool pNumbers: true
   property bool pTab: true
   property bool pScroll: true
-  property bool pSeparator: false
-  property string pAnimation: "slide"
+  property string pEffect: "slide"
+  property string pMode: "horizontal"
+  property string pToggle: "SUPER + F"
+  property string pSend: "SUPER + SHIFT + F"
 
-  // Workspace animation styles Hyprland accepts, plus "none" to leave its own
-  // workspace animation alone.
-  readonly property var animationChoices: [
+  readonly property string repoUrl: "https://github.com/thevideinfra/tandem"
+
+  // ---- Editing the switch keys ----
+  // A key is a set of modifiers plus one plain key. The plain key is captured
+  // from a real key press while the panel has focus; the modifiers are chosen
+  // with buttons, because SUPER + the key would be taken by the compositor
+  // bind before the panel ever saw it.
+  readonly property var modifierNames: ["SUPER", "SHIFT", "CTRL", "ALT"]
+  property string keyEdit: ""      // "toggle", "send" or "" for none
+  property bool capturing: false   // waiting for the plain key
+  property string keyError: ""
+
+  function keyParts(spec) {
+    return String(spec).split("+").map(function(p) { return p.trim() })
+      .filter(function(p) { return p !== "" })
+  }
+
+  function keyModifiers(spec) {
+    return keyParts(spec).filter(function(p) { return modifierNames.indexOf(p) >= 0 })
+  }
+
+  function keyBase(spec) {
+    var rest = keyParts(spec).filter(function(p) { return modifierNames.indexOf(p) < 0 })
+    return rest.length > 0 ? rest[rest.length - 1] : ""
+  }
+
+  function joinKey(mods, base) {
+    var ordered = modifierNames.filter(function(m) { return mods.indexOf(m) >= 0 })
+    return ordered.concat([base]).join(" + ")
+  }
+
+  // The carry-a-window key is the switch key with SHIFT added, unless it has
+  // been set to something else. While it is still that, it follows the switch
+  // key.
+  function withShift(spec) {
+    var mods = keyModifiers(spec)
+    if (mods.indexOf("SHIFT") < 0) mods.push("SHIFT")
+    return joinKey(mods, keyBase(spec))
+  }
+
+  function setKey(which, spec) {
+    keyError = ""
+    if (which === "toggle") {
+      var follows = pSend === withShift(pToggle)
+      pToggle = spec
+      if (follows) pSend = withShift(spec)
+    } else {
+      pSend = spec
+    }
+    if (pToggle === pSend) keyError = "Both keys are the same"
+  }
+
+  function toggleModifier(which, name) {
+    var spec = which === "toggle" ? pToggle : pSend
+    var mods = keyModifiers(spec)
+    var at = mods.indexOf(name)
+    if (at >= 0) mods.splice(at, 1)
+    else mods.push(name)
+    if (mods.length === 0) {
+      keyError = "Keep at least one modifier"
+      return
+    }
+    setKey(which, joinKey(mods, keyBase(spec)))
+  }
+
+  // Qt key -> the key name Hyprland binds use. Anything not listed is not
+  // offered rather than guessed at.
+  readonly property var keyNames: ({
+    [Qt.Key_Space]: "space", [Qt.Key_Return]: "Return", [Qt.Key_Enter]: "Return",
+    [Qt.Key_Tab]: "Tab", [Qt.Key_Backspace]: "BackSpace",
+    [Qt.Key_Left]: "Left", [Qt.Key_Right]: "Right", [Qt.Key_Up]: "Up", [Qt.Key_Down]: "Down",
+    [Qt.Key_Home]: "Home", [Qt.Key_End]: "End", [Qt.Key_PageUp]: "Prior", [Qt.Key_PageDown]: "Next",
+    [Qt.Key_Comma]: "comma", [Qt.Key_Period]: "period", [Qt.Key_Slash]: "slash",
+    [Qt.Key_Semicolon]: "semicolon", [Qt.Key_Apostrophe]: "apostrophe",
+    [Qt.Key_Minus]: "minus", [Qt.Key_Equal]: "equal",
+    [Qt.Key_BracketLeft]: "bracketleft", [Qt.Key_BracketRight]: "bracketright",
+    [Qt.Key_Backslash]: "backslash", [Qt.Key_QuoteLeft]: "grave"
+  })
+
+  function hyprKeyName(key) {
+    if (key >= Qt.Key_A && key <= Qt.Key_Z) return String.fromCharCode(key)
+    if (key >= Qt.Key_0 && key <= Qt.Key_9) return String.fromCharCode(key)
+    if (key >= Qt.Key_F1 && key <= Qt.Key_F12) return "F" + (key - Qt.Key_F1 + 1)
+    return keyNames[key] || ""
+  }
+
+  function isModifierKey(key) {
+    return key === Qt.Key_Shift || key === Qt.Key_Control || key === Qt.Key_Alt
+      || key === Qt.Key_Meta || key === Qt.Key_Super_L || key === Qt.Key_Super_R
+      || key === Qt.Key_AltGr || key === Qt.Key_CapsLock
+  }
+
+  function captureKey(event) {
+    if (event.key === Qt.Key_Escape) {
+      capturing = false
+      keyKeeper.focus = false
+      keyCatcher.forceActiveFocus()
+      return
+    }
+    if (isModifierKey(event.key)) return
+    var name = hyprKeyName(event.key)
+    if (name === "") {
+      keyError = "That key is not supported"
+    } else {
+      var spec = keyEdit === "toggle" ? pToggle : pSend
+      setKey(keyEdit, joinKey(keyModifiers(spec), name))
+    }
+    capturing = false
+    keyCatcher.forceActiveFocus()
+  }
+
+  // ---- Switch mode and transition ----
+  // Hyprland takes one style string that fuses the two: "slide" and
+  // "slidevert", "slidefade" and "slidefadevert", plus "fade" and "none".
+  // The panel offers them as two choices -- which way the monitors are
+  // arranged, and what the switch looks like -- and joins them on apply.
+  // Fade and none have no direction, so the mode is saved on its own for the
+  // popup and the panel to follow.
+  readonly property bool stacked: {
+    var mons = root.detected
+    if (!mons || mons.length < 2) return false
+    var a = mons[0], b = mons[1]
+    var sideBySide = a.y < b.y + b.height && b.y < a.y + a.height
+    return !sideBySide
+  }
+
+  function effectOf(style) {
+    if (style === "slidevert") return "slide"
+    if (style === "slidefadevert") return "slidefade"
+    return style
+  }
+
+  function modeOf(style) {
+    if (style === "slidevert" || style === "slidefadevert") return "vertical"
+    if (style === "slide" || style === "slidefade") return "horizontal"
+    if (root.savedMode !== "") return root.savedMode
+    return root.stacked ? "vertical" : "horizontal"
+  }
+
+  function styleOf(effect, mode) {
+    if (effect === "slide") return mode === "vertical" ? "slidevert" : "slide"
+    if (effect === "slidefade") return mode === "vertical" ? "slidefadevert" : "slidefade"
+    return effect
+  }
+
+  readonly property string effect: effectOf(animation)
+  readonly property string mode: modeOf(animation)
+
+  readonly property var effectChoices: [
     { value: "slide", label: "Slide" },
-    { value: "slidevert", label: "Slide vertical" },
     { value: "fade", label: "Fade" },
     { value: "slidefade", label: "Slide + fade" },
-    { value: "slidefadevert", label: "Slide + fade vertical" },
-    { value: "none", label: "Hyprland default" }
+    { value: "none", label: "Default" }
   ]
 
   property bool busy: false
   property string errorText: ""
 
-  // ---- Display settings, set from the gear view ----
+  // ---- Display settings ----
   // Same scales as omaudiopanel, so the two panels match side by side.
   property string density: "normal"
   property string fontSize: "normal"
-  property bool showMonitors: true
-  property bool showKeys: true
   property bool popup: false
+  property string indicator: "boxes"
+  property bool divider: false
   readonly property real densityScale:
-    density === "compact" ? 0.61 : (density === "comfortable" ? 0.83 : 0.71)
+    density === "compact" ? 0.61 : (density === "roomy" ? 0.83 : 0.71)
   // Text shrinks half as fast as spacing so compact stays readable, then the
   // font size setting scales it on top.
   readonly property real fontScale: (0.5 + 0.5 * densityScale)
@@ -82,16 +230,18 @@ Panel {
   readonly property real fontSmall: Math.max(9, Math.round(Style.font.title * fontScale * 0.9))
   readonly property real fontCaption: Math.max(9, Math.round(Style.font.caption * fontScale))
   readonly property real fontDisplay: Math.round(Style.font.display * fontScale)
-  property bool settingsOpen: false
 
-  // Room a switch row needs for its longest label plus the switch itself.
-  readonly property real labelWidth: Math.ceil(labelMetrics.advanceWidth) + root.sp(8) + root.sp(34)
+  property string page: "desktops"
+  readonly property var pages: [
+    { id: "desktops", label: "Desktops", icon: "" },
+    { id: "keybinds", label: "Keybinds", icon: "" },
+    { id: "styling", label: "Styling", icon: "" }
+  ]
 
-  TextMetrics {
-    id: labelMetrics
-    font.family: Style.font.family
-    font.pixelSize: root.fontBody
-    text: "SUPER+1..10 jumps to a desktop"
+  function stepPage(step) {
+    var index = 0
+    for (var i = 0; i < pages.length; i++) if (pages[i].id === page) index = i
+    page = pages[((index + step) % pages.length + pages.length) % pages.length].id
   }
 
   // Style.space scaled by the chosen density.
@@ -99,9 +249,18 @@ Panel {
     return Style.space(px * densityScale)
   }
 
+  function tint(alpha) {
+    return Util.alpha(root.barForeground, alpha)
+  }
+
   function setDisplay(key, value) {
     root[key] = value
     Quickshell.execDetached([root.pluginDir + "/tandem-config", "set", key, String(value)])
+  }
+
+  function showDesk(index) {
+    if (!root.bar) return
+    root.bar.run("hyprctl dispatch " + Util.shellQuote("tandem_show(" + index + ")"))
   }
 
   // Desktops are laid out one workspace per monitor, as in the indicator.
@@ -149,9 +308,19 @@ Panel {
   readonly property bool labelsDirty:
     JSON.stringify(pLabels) !== JSON.stringify(savedLabels)
 
-  readonly property bool dirty: pDesktops !== desktops
-    || pNumbers !== numbers || pTab !== tabKeys || pScroll !== scrollKeys
-    || pSeparator !== separator || pAnimation !== animation || labelsDirty
+  // How many separate edits are waiting for Apply.
+  readonly property int pending:
+    (pDesktops !== desktops ? 1 : 0)
+    + (labelsDirty ? 1 : 0)
+    + (pNumbers !== numbers ? 1 : 0)
+    + (pTab !== tabKeys ? 1 : 0)
+    + (pScroll !== scrollKeys ? 1 : 0)
+    + (pEffect !== effect ? 1 : 0)
+    + (pMode !== mode ? 1 : 0)
+    + (pToggle !== toggleKey ? 1 : 0)
+    + (pSend !== sendKey ? 1 : 0)
+
+  readonly property bool dirty: pending > 0 && keyError === ""
 
   // Panel is a plain Item; the bar slot takes its size from here, so without
   // this the widget collapses to zero width and never renders.
@@ -170,8 +339,13 @@ Panel {
     pNumbers = numbers
     pTab = tabKeys
     pScroll = scrollKeys
-    pSeparator = separator
-    pAnimation = animation
+    pEffect = effect
+    pMode = mode
+    pToggle = toggleKey
+    pSend = sendKey
+    keyEdit = ""
+    capturing = false
+    keyError = ""
     errorText = ""
   }
 
@@ -182,15 +356,16 @@ Panel {
       numbers = data.numbers === true
       tabKeys = data.tab === true
       scrollKeys = data.scroll === true
-      separator = data.separator === true
       toggleKey = data.toggle
       sendKey = data.send
+      version = data.version || ""
+      savedMode = data.mode || ""
       animation = data.animation || "slide"
       density = data.density || "normal"
       fontSize = data.fontSize || "normal"
-      showMonitors = data.showMonitors !== false
-      showKeys = data.showKeys !== false
       popup = data.popup === true
+      indicator = data.indicator === "text" ? "text" : "boxes"
+      divider = data.divider === true
       detected = data.detected || []
       savedLabels = normalizeLabels(data.labels, data.desktops)
       revert()
@@ -206,8 +381,13 @@ Panel {
     if (pNumbers !== numbers) patch.numbers = pNumbers
     if (pTab !== tabKeys) patch.tab = pTab
     if (pScroll !== scrollKeys) patch.scroll = pScroll
-    if (pSeparator !== separator) patch.separator = pSeparator
-    if (pAnimation !== animation) patch.animation = pAnimation
+    if (pToggle !== toggleKey) patch.toggle = pToggle
+    if (pSend !== sendKey) patch.send = pSend
+    if (pEffect !== effect || pMode !== mode) {
+      var style = styleOf(pEffect, pMode)
+      if (style !== animation) patch.animation = style
+      patch.mode = pMode
+    }
     if (labelsDirty) {
       // Blank fields fall back to the default name, and an all-default set is
       // stored as [] so the config does not carry redundant D1..Dn.
@@ -262,12 +442,21 @@ Panel {
     root.close()
   }
 
+  // True while a name field has focus, so typed letters reach it instead of
+  // being taken as panel keys (j, k, h, l and x all are).
+  property bool editing: false
+
   // Re-read on open so the panel never shows values a wizard run has changed,
-  // and drop any edits that were staged but never applied. Closing always
-  // returns to the main view.
+  // and drop any edits that were staged but never applied. It opens on the
+  // desktops page.
   onOpenedChanged: {
     if (opened) reload()
-    else settingsOpen = false
+    else {
+      page = "desktops"
+      editing = false
+      capturing = false
+      keyEdit = ""
+    }
   }
 
   Process {
@@ -312,33 +501,46 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    // Wide enough for the longest switch label, measured, so a theme with a
-    // different text-to-spacing ratio does not cut it off.
-    contentWidth: panel.fittedContentWidth(Math.max(root.sp(304), root.labelWidth + panel.verticalContentInset))
+    // Never narrower than the status line and the banner need, whatever the
+    // density scales the spacing down to.
+    contentWidth: panel.fittedContentWidth(Math.max(root.sp(330), Style.space(220)))
     contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      blocked: root.editing || root.capturing
       onCloseRequested: root.close()
       onActivateRequested: root.apply()
+      onMoveRequested: function(dx, dy) { if (dx !== 0) root.stepPage(dx) }
       onTabRequested: function(direction) { root.switchPanel(direction) }
+
+      // Takes focus while a key is being captured, so the press reaches it
+      // before anything else in the panel.
+      Item {
+        id: keyKeeper
+        Keys.onPressed: function(event) {
+          if (!root.capturing) return
+          root.captureKey(event)
+          event.accepted = true
+        }
+      }
 
       Column {
         id: column
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        spacing: root.sp(12)
+        spacing: root.sp(10)
 
-        // ---------- Header: icon · title/status · gear ----------
+        // ---------- Header: icon · title/status · close ----------
         Item {
           width: parent.width
-          implicitHeight: Math.max(headerIcon.implicitHeight, headerLabels.implicitHeight, gearButton.implicitHeight)
+          implicitHeight: Math.max(headerIcon.implicitHeight, headerLabels.implicitHeight)
 
           TandemIcon {
             id: headerIcon
-            iconWidth: Math.round(root.fontDisplay * 1.3)
+            iconWidth: Math.round(root.fontDisplay * 1.5)
             color: Color.accent
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
@@ -347,178 +549,327 @@ Panel {
           Column {
             id: headerLabels
             anchors.left: headerIcon.right
-            anchors.leftMargin: root.sp(10)
-            anchors.right: gearButton.left
-            anchors.rightMargin: root.sp(12)
+            anchors.leftMargin: root.sp(12)
+            anchors.right: closeButton.left
+            anchors.rightMargin: root.sp(8)
             anchors.verticalCenter: parent.verticalCenter
             spacing: root.sp(2)
 
-            Text {
+            Row {
               width: parent.width
-              text: "Tandem"
-              color: root.barForeground
-              font.family: Style.font.family
-              font.pixelSize: root.fontTitle
-              font.bold: true
-              elide: Text.ElideRight
+              spacing: root.sp(7)
+
+              Text {
+                id: titleText
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Tandem"
+                color: root.barForeground
+                font.family: Style.font.family
+                font.pixelSize: root.fontTitle
+                font.bold: true
+              }
+
+              Rectangle {
+                visible: root.version !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                width: versionText.implicitWidth + root.sp(10)
+                height: versionText.implicitHeight + root.sp(4)
+                radius: height / 2
+                color: Util.alpha(Color.accent, 0.15)
+                border.width: 1
+                border.color: Util.alpha(Color.accent, 0.45)
+
+                Text {
+                  id: versionText
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: "v" + root.version
+                  color: Color.accent
+                  font.family: Style.font.family
+                  font.pixelSize: root.fontCaption
+                  font.bold: true
+                }
+              }
+
+              // Opens the repository in the browser.
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: "\uf09b"
+                color: repoMouse.containsMouse ? Color.accent : root.barForeground
+                opacity: repoMouse.containsMouse ? 1.0 : 0.6
+                font.family: Style.font.family
+                font.pixelSize: root.fontBody
+
+                MouseArea {
+                  id: repoMouse
+                  anchors.fill: parent
+                  anchors.margins: -root.sp(4)
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    if (root.bar) root.bar.run("xdg-open " + Util.shellQuote(root.repoUrl))
+                    root.close()
+                  }
+                }
+
+                PanelToolTip {
+                  visible: repoMouse.containsMouse
+                  text: "Open on GitHub"
+                  fontFamily: Style.font.family
+                }
+              }
             }
 
             Text {
               width: parent.width
               textFormat: Text.PlainText
-              text: ("Desktop " + root.currentDesk + " of " + root.desktops
+              text: ("Desktop " + root.currentDesk + "/" + root.desktops
                 + " · " + root.monitorCount
                 + (root.monitorCount === 1 ? " monitor" : " monitors")).toUpperCase()
               color: Qt.darker(root.barForeground, 1.4)
               font.family: Style.font.family
               font.pixelSize: root.fontCaption
               font.bold: true
-              font.letterSpacing: 1.2
+              font.letterSpacing: 0.6
               elide: Text.ElideRight
             }
           }
 
-          // Opens the settings view in place of the panel content.
-          Text {
-            id: gearButton
+          Rectangle {
+            id: closeButton
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: root.settingsOpen ? "󰅖" : "󰒓"
-            // Larger than the header text and accent on hover, so it reads
-            // as a control rather than decoration.
-            color: gearMouse.containsMouse || root.settingsOpen ? Color.accent : root.barForeground
-            font.family: Style.font.family
-            font.pixelSize: Math.round(root.fontTitle * 1.45)
-            opacity: gearMouse.containsMouse || root.settingsOpen ? 1.0 : 0.85
+            width: root.sp(26)
+            height: root.sp(26)
+            radius: root.sp(6)
+            color: closeMouse.containsMouse ? root.tint(0.12) : "transparent"
+
+            Text {
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: ""
+              color: root.barForeground
+              font.family: Style.font.family
+              font.pixelSize: root.fontBody
+            }
 
             MouseArea {
-              id: gearMouse
+              id: closeMouse
               anchors.fill: parent
-              anchors.margins: -root.sp(4)
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              onClicked: root.settingsOpen = !root.settingsOpen
+              onClicked: root.close()
             }
 
             PanelToolTip {
-              visible: gearMouse.containsMouse
-              text: root.settingsOpen ? "Close settings" : "Panel settings"
+              visible: closeMouse.containsMouse
+              text: "Close"
               fontFamily: Style.font.family
             }
           }
         }
 
-        MainView {
-          width: parent.width
-          visible: !root.settingsOpen
-        }
+        PanelSeparator { foreground: root.barForeground }
 
-        SettingsView {
-          width: parent.width
-          visible: root.settingsOpen
-        }
-
-        // ---------- apply / revert, shared by both views ----------
-        PanelSeparator {
-          visible: root.dirty || root.busy
-          foreground: root.barForeground
-        }
-
+        // ---------- Pages ----------
+        // Sized to the tallest page so the panel does not jump about as the
+        // tabs change.
         Item {
           width: parent.width
-          visible: root.dirty || root.busy
-          implicitHeight: applyLabel.implicitHeight
+          implicitHeight: Math.max(desktopsPage.implicitHeight,
+            keybindsPage.implicitHeight, stylingPage.implicitHeight)
 
-          Text {
-            id: applyLabel
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: root.busy ? "Applying..." : "\uf0c7  Apply changes"
-            color: root.busy ? Qt.darker(root.barForeground, 1.5) : Color.accent
-            font.family: Style.font.family
-            font.pixelSize: root.fontBody
-            font.bold: !root.busy
-            opacity: applyMouse.containsMouse || root.busy ? 1.0 : 0.9
-          }
+          DesktopsPage { id: desktopsPage; visible: root.page === "desktops" }
+          KeybindsPage { id: keybindsPage; visible: root.page === "keybinds" }
+          StylingPage { id: stylingPage; visible: root.page === "styling" }
+        }
 
-          Text {
-            id: revertLabel
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            visible: !root.busy
-            textFormat: Text.PlainText
-            text: "\uf0e2  Revert"
-            color: root.barForeground
-            opacity: revertMouse.containsMouse ? 1.0 : 0.6
-            font.family: Style.font.family
-            font.pixelSize: root.fontSmall
-          }
+        // ---------- Staged changes ----------
+        Rectangle {
+          width: parent.width
+          visible: root.dirty || root.busy || root.errorText !== ""
+          implicitHeight: bannerRow.implicitHeight + root.sp(16)
+          radius: root.sp(7)
+          color: Util.alpha(root.errorText !== "" ? (root.bar ? root.bar.urgent : Color.urgent) : Color.accent, 0.12)
+          border.width: 1
+          border.color: Util.alpha(root.errorText !== "" ? (root.bar ? root.bar.urgent : Color.urgent) : Color.accent, 0.4)
 
-          MouseArea {
-            id: applyMouse
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: revertLabel.visible ? revertLabel.left : parent.right
-            anchors.topMargin: -root.sp(4)
-            anchors.bottomMargin: -root.sp(4)
-            enabled: root.dirty && !root.busy
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.apply()
-          }
+          Row {
+            id: bannerRow
+            anchors.fill: parent
+            anchors.margins: root.sp(8)
+            spacing: root.sp(8)
 
-          MouseArea {
-            id: revertMouse
-            anchors.fill: revertLabel
-            anchors.margins: -root.sp(4)
-            enabled: revertLabel.visible
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.revert()
+            Text {
+              width: parent.width - revertText.width - applyButton.width - root.sp(16)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: root.errorText !== "" ? root.errorText
+                : (root.busy ? "Applying..." : root.pending + " pending")
+              color: root.barForeground
+              font.family: Style.font.family
+              font.pixelSize: root.fontSmall
+              font.bold: true
+              elide: Text.ElideRight
+            }
+
+            Text {
+              id: revertText
+              anchors.verticalCenter: parent.verticalCenter
+              visible: !root.busy
+              textFormat: Text.PlainText
+              text: "Revert"
+              color: root.barForeground
+              opacity: revertMouse.containsMouse ? 1.0 : 0.65
+              font.family: Style.font.family
+              font.pixelSize: root.fontSmall
+
+              MouseArea {
+                id: revertMouse
+                anchors.fill: parent
+                anchors.margins: -root.sp(4)
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.revert()
+              }
+            }
+
+            Rectangle {
+              id: applyButton
+              anchors.verticalCenter: parent.verticalCenter
+              width: applyText.implicitWidth + root.sp(18)
+              height: applyText.implicitHeight + root.sp(10)
+              radius: root.sp(6)
+              color: Color.accent
+              opacity: root.busy ? 0.5 : (applyMouse.containsMouse ? 1.0 : 0.9)
+
+              Text {
+                id: applyText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: "Apply & reload"
+                color: root.onAccent
+                font.family: Style.font.family
+                font.pixelSize: root.fontSmall
+                font.bold: true
+              }
+
+              MouseArea {
+                id: applyMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                enabled: root.dirty && !root.busy
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.apply()
+              }
+            }
           }
         }
 
-        Text {
+        // ---------- Tabs ----------
+        PanelSeparator { foreground: root.barForeground }
+
+        Row {
           width: parent.width
-          visible: root.errorText !== ""
-          text: root.errorText
-          color: root.bar ? root.bar.urgent : Color.urgent
-          font.family: Style.font.family
-          font.pixelSize: root.fontCaption
+
+          Repeater {
+            model: root.pages
+
+            Item {
+              id: tab
+              required property var modelData
+              readonly property bool current: root.page === modelData.id
+              width: parent.width / root.pages.length
+              height: tabColumn.implicitHeight + root.sp(8)
+
+              Rectangle {
+                visible: tab.current
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width * 0.5
+                height: Math.max(2, root.sp(2))
+                radius: height / 2
+                color: Color.accent
+              }
+
+              Column {
+                id: tabColumn
+                anchors.centerIn: parent
+                spacing: root.sp(2)
+
+                Text {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  textFormat: Text.PlainText
+                  text: tab.modelData.icon
+                  color: tab.current ? Color.accent : root.barForeground
+                  opacity: tab.current || tabMouse.containsMouse ? 1.0 : 0.55
+                  font.family: Style.font.family
+                  font.pixelSize: root.fontTitle
+                }
+
+                Text {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  textFormat: Text.PlainText
+                  text: tab.modelData.label
+                  color: tab.current ? Color.accent : root.barForeground
+                  opacity: tab.current || tabMouse.containsMouse ? 1.0 : 0.55
+                  font.family: Style.font.family
+                  font.pixelSize: root.fontCaption
+                  font.bold: tab.current
+                }
+              }
+
+              MouseArea {
+                id: tabMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.page = tab.modelData.id
+              }
+            }
+          }
         }
       }
     }
   }
 
-  // Desktop count, names and what the keys do.
-  component MainView: Column {
+  // Text on an accent fill: black or white by the accent's luminance, so it
+  // stays readable whatever the theme's accent is.
+  readonly property color onAccent: {
+    var c = Color.accent
+    return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) > 0.5 ? "#101014" : "#ffffff"
+  }
+
+  // ===================== pages =====================
+
+  component DesktopsPage: Column {
+    width: parent.width
     spacing: root.sp(10)
 
-    PanelSeparator { foreground: root.barForeground }
+    SectionLabel { icon: ""; text: "DESKTOPS"; tag: "REQUIRES APPLY" }
 
     Item {
       width: parent.width
-      implicitHeight: Math.max(desktopsHeader.implicitHeight, stepper.implicitHeight)
+      implicitHeight: stepper.implicitHeight
 
-      SectionHeader {
-        id: desktopsHeader
+      Text {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        text: "DESKTOPS"
+        textFormat: Text.PlainText
+        text: root.pDesktops + (root.pDesktops === 1 ? " desktop" : " desktops")
+        color: root.barForeground
+        font.family: Style.font.family
+        font.pixelSize: root.fontBody
       }
 
       Row {
         id: stepper
         anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
         spacing: root.sp(8)
 
         StepButton {
-          anchors.verticalCenter: parent.verticalCenter
-          iconText: "\uf068"
+          iconText: ""
           tooltipText: "One fewer desktop"
           active: root.pDesktops > 1
           onClicked: if (root.pDesktops > 1) root.pDesktops--
@@ -536,8 +887,7 @@ Panel {
         }
 
         StepButton {
-          anchors.verticalCenter: parent.verticalCenter
-          iconText: "\uf067"
+          iconText: ""
           tooltipText: "One more desktop"
           active: root.pDesktops < 10
           onClicked: if (root.pDesktops < 10) root.pDesktops++
@@ -545,150 +895,334 @@ Panel {
       }
     }
 
-    // One row per desktop. The desktop you are on gets an accent stripe and
-    // number, like the device in use in the audio panel.
+    // One row per desktop: its number, a name field, and either an ACTIVE
+    // mark or a button to switch to it.
     Column {
       width: parent.width
-      spacing: root.sp(4)
+      spacing: root.sp(5)
 
       Repeater {
         model: root.labelSlots
 
-        Item {
-          id: nameRow
+        Rectangle {
+          id: deskRow
           required property var modelData
           readonly property bool current: modelData.i + 1 === root.currentDesk
           width: parent.width
-          implicitHeight: nameField.implicitHeight
+          implicitHeight: nameField.implicitHeight + root.sp(10)
+          radius: root.sp(7)
+          color: current ? Util.alpha(Color.accent, 0.12) : root.tint(0.05)
+          border.width: 1
+          border.color: current ? Util.alpha(Color.accent, 0.45) : root.tint(0.1)
 
           Rectangle {
-            visible: nameRow.current
+            width: root.sp(26)
+            height: root.sp(26)
+            id: numberChip
             anchors.left: parent.left
+            anchors.leftMargin: root.sp(6)
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.max(2, root.sp(3))
-            height: parent.height - root.sp(6)
-            radius: width / 2
-            color: Color.accent
+            radius: root.sp(6)
+            color: root.tint(0.08)
+            border.width: 1
+            border.color: deskRow.current ? Color.accent : root.tint(0.18)
+
+            Text {
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: deskRow.modelData.i + 1
+              color: deskRow.current ? Color.accent : root.barForeground
+              font.family: Style.font.family
+              font.pixelSize: root.fontSmall
+              font.bold: true
+            }
           }
 
-          Text {
-            id: nameIndex
-            anchors.left: parent.left
-            anchors.leftMargin: root.sp(10)
+          // ACTIVE on the current desktop, Switch on the others.
+          Item {
+            id: rowAction
+            anchors.right: parent.right
+            anchors.rightMargin: root.sp(6)
             anchors.verticalCenter: parent.verticalCenter
-            width: root.sp(24)
-            text: modelData.i + 1
-            color: nameRow.current ? Color.accent : root.barForeground
-            opacity: nameRow.current ? 1.0 : 0.55
-            font.family: Style.font.family
-            font.pixelSize: root.fontSmall
-            font.bold: nameRow.current
+            width: Math.max(activeText.implicitWidth, switchText.implicitWidth) + root.sp(16)
+            height: activeText.implicitHeight + root.sp(8)
+
+            Rectangle {
+              anchors.fill: parent
+              visible: deskRow.current
+              radius: root.sp(5)
+              color: Color.accent
+
+              Text {
+                id: activeText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: "ACTIVE"
+                color: root.onAccent
+                font.family: Style.font.family
+                font.pixelSize: root.fontCaption
+                font.bold: true
+                font.letterSpacing: 0.8
+              }
+            }
+
+            Rectangle {
+              anchors.fill: parent
+              visible: !deskRow.current
+              radius: root.sp(5)
+              color: switchMouse.containsMouse ? Util.alpha(Color.accent, 0.18) : "transparent"
+              border.width: 1
+              border.color: switchMouse.containsMouse ? Color.accent : root.tint(0.25)
+
+              Text {
+                id: switchText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: "Switch"
+                color: switchMouse.containsMouse ? Color.accent : root.barForeground
+                font.family: Style.font.family
+                font.pixelSize: root.fontCaption
+              }
+
+              MouseArea {
+                id: switchMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.showDesk(deskRow.modelData.i + 1)
+              }
+            }
           }
 
           TextField {
             id: nameField
-            anchors.left: nameIndex.right
-            anchors.right: parent.right
+            anchors.left: numberChip.right
+            anchors.leftMargin: root.sp(6)
+            anchors.right: rowAction.left
+            anchors.rightMargin: root.sp(6)
             anchors.verticalCenter: parent.verticalCenter
-            placeholderText: root.defaultLabel(modelData.i)
+            placeholderText: root.defaultLabel(deskRow.modelData.i)
             foreground: root.barForeground
             font.family: Style.font.family
             font.pixelSize: root.fontBody
-            verticalPadding: root.sp(5)
+            verticalPadding: root.sp(4)
             maximumLength: 16
 
             // Set once rather than bound: a binding would fight the cursor
             // while typing, since editing rewrites the array it reads from.
-            Component.onCompleted: text = modelData.initial
-            onTextChanged: root.setLabel(modelData.i, text)
+            Component.onCompleted: text = deskRow.modelData.initial
+            onTextChanged: root.setLabel(deskRow.modelData.i, text)
+            onActiveFocusChanged: root.editing = activeFocus
+            Keys.onEscapePressed: keyCatcher.forceActiveFocus()
           }
         }
       }
     }
 
-    Caption {
-      width: parent.width
-      text: "Blank falls back to D1..D" + root.pDesktops + "."
-    }
+    Caption { width: parent.width; text: "Blank falls back to D1..D" + root.pDesktops + "." }
 
-    PanelSeparator { visible: root.showMonitors; foreground: root.barForeground }
-    SectionHeader { visible: root.showMonitors; text: "MONITORS" }
+    PanelSeparator { foreground: root.barForeground }
+    SectionLabel { icon: ""; text: "MONITORS" }
 
     Column {
-      visible: root.showMonitors
       width: parent.width
-      spacing: root.sp(3)
+      spacing: root.sp(5)
 
       Repeater {
         model: root.detected
 
-        KeyValue {
+        Rectangle {
+          id: monitorRow
           required property var modelData
           required property int index
           width: parent.width
-          key: (index + 1) + ". " + modelData.name
-          note: root.monitorPosition(index)
-          value: modelData.width + "x" + modelData.height
+          implicitHeight: monitorName.implicitHeight + root.sp(16)
+          radius: root.sp(7)
+          color: root.tint(0.05)
+          border.width: 1
+          border.color: root.tint(0.1)
+
+          Text {
+            id: monitorIcon
+            anchors.left: parent.left
+            anchors.leftMargin: root.sp(10)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: ""
+            color: root.barForeground
+            opacity: 0.7
+            font.family: Style.font.family
+            font.pixelSize: root.fontTitle
+          }
+
+          Text {
+            id: monitorName
+            anchors.left: monitorIcon.right
+            anchors.leftMargin: root.sp(10)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: monitorRow.modelData.name
+            color: root.barForeground
+            font.family: Style.font.family
+            font.pixelSize: root.fontBody
+            font.bold: true
+          }
+
+          Text {
+            anchors.left: monitorName.right
+            anchors.leftMargin: root.sp(10)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: root.monitorPosition(monitorRow.index)
+            color: root.barForeground
+            opacity: 0.55
+            font.family: Style.font.family
+            font.pixelSize: root.fontSmall
+          }
+
+          Text {
+            anchors.right: parent.right
+            anchors.rightMargin: root.sp(10)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: monitorRow.modelData.width + " × " + monitorRow.modelData.height
+            color: root.barForeground
+            opacity: 0.7
+            font.family: Style.font.family
+            font.pixelSize: root.fontSmall
+          }
         }
       }
     }
-
-    PanelSeparator { visible: root.showKeys; foreground: root.barForeground }
-    SectionHeader { visible: root.showKeys; text: "KEYS" }
-
-    Column {
-      visible: root.showKeys
-      width: parent.width
-      spacing: root.sp(3)
-
-      KeyValue { width: parent.width; key: "Next desktop"; value: root.toggleKey }
-      KeyValue { width: parent.width; key: "Send window"; value: root.sendKey }
-    }
   }
 
-  // Replaces the main view while the gear is on. Density, font size and the
-  // section switches save straight away; the rest is staged for Apply like the main view.
-  component SettingsView: Column {
+  component KeybindsPage: Column {
+    width: parent.width
     spacing: root.sp(10)
 
-    PanelSeparator { foreground: root.barForeground }
+    SectionLabel { icon: ""; text: "SWITCH KEYS" }
+
+    Column {
+      width: parent.width
+      spacing: root.sp(5)
+
+      KeyEditor { width: parent.width; which: "toggle"; label: "Next desktop" }
+      KeyEditor { width: parent.width; which: "send"; label: "Send window" }
+    }
+
+    Caption {
+      width: parent.width
+      visible: root.keyError === ""
+      text: "Click a row to change its keys."
+    }
 
     Text {
+      width: parent.width
+      visible: root.keyError !== ""
       textFormat: Text.PlainText
-      text: "󰁍 Back"
-      color: root.barForeground
+      text: root.keyError
+      wrapMode: Text.WordWrap
+      color: root.bar ? root.bar.urgent : Color.urgent
       font.family: Style.font.family
-      font.pixelSize: root.fontSmall
-      font.bold: true
-      opacity: backMouse.containsMouse ? 1.0 : 0.75
+      font.pixelSize: root.fontCaption
+    }
 
-      MouseArea {
-        id: backMouse
-        anchors.fill: parent
-        anchors.margins: -root.sp(4)
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.settingsOpen = false
+    PanelSeparator { foreground: root.barForeground }
+    SectionLabel { icon: ""; text: "EXTRA BINDS"; tag: "REQUIRES APPLY" }
+
+    Column {
+      width: parent.width
+      spacing: root.sp(7)
+
+      SettingSwitch {
+        width: parent.width
+        label: "Jump with SUPER + 1.." + root.pDesktops
+        checked: root.pNumbers
+        onToggled: root.pNumbers = !root.pNumbers
+      }
+
+      SettingSwitch {
+        width: parent.width
+        label: "SUPER + TAB cycles"
+        checked: root.pTab
+        onToggled: root.pTab = !root.pTab
+      }
+
+      SettingSwitch {
+        width: parent.width
+        label: "SUPER + scroll cycles"
+        checked: root.pScroll
+        onToggled: root.pScroll = !root.pScroll
       }
     }
 
-    SectionHeader { text: "DENSITY" }
+    PanelSeparator { foreground: root.barForeground }
 
-    ChoiceChips {
+    Rectangle {
       width: parent.width
+      implicitHeight: wizardText.implicitHeight + root.sp(18)
+      radius: root.sp(7)
+      color: wizardMouse.containsMouse ? Util.alpha(Color.accent, 0.12) : root.tint(0.05)
+      border.width: 1
+      border.color: wizardMouse.containsMouse ? Util.alpha(Color.accent, 0.45) : root.tint(0.1)
+
+      Text {
+        id: wizardText
+        anchors.left: parent.left
+        anchors.leftMargin: root.sp(10)
+        anchors.verticalCenter: parent.verticalCenter
+        textFormat: Text.PlainText
+        text: "  Re-run setup wizard"
+        color: wizardMouse.containsMouse ? Color.accent : root.barForeground
+        font.family: Style.font.family
+        font.pixelSize: root.fontBody
+      }
+
+      Text {
+        anchors.right: parent.right
+        anchors.rightMargin: root.sp(10)
+        anchors.verticalCenter: parent.verticalCenter
+        textFormat: Text.PlainText
+        text: ""
+        color: root.barForeground
+        opacity: 0.55
+        font.family: Style.font.family
+        font.pixelSize: root.fontSmall
+      }
+
+      MouseArea {
+        id: wizardMouse
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.runSetup()
+      }
+    }
+  }
+
+  component StylingPage: Column {
+    width: parent.width
+    spacing: root.sp(9)
+
+    SectionLabel { icon: ""; text: "DENSITY" }
+
+    Segmented {
+      width: parent.width
+      columns: 3
       choices: [
         { value: "compact", label: "Compact" },
         { value: "normal", label: "Normal" },
-        { value: "comfortable", label: "Comfortable" }
+        { value: "roomy", label: "Roomy" }
       ]
       selected: root.density
       onPicked: function(value) { root.setDisplay("density", value) }
     }
 
-    SectionHeader { text: "FONT SIZE" }
+    SectionLabel { icon: ""; text: "FONT SIZE" }
 
-    ChoiceChips {
+    Segmented {
       width: parent.width
+      columns: 3
       choices: [
         { value: "small", label: "Small" },
         { value: "normal", label: "Normal" },
@@ -698,70 +1232,127 @@ Panel {
       onPicked: function(value) { root.setDisplay("fontSize", value) }
     }
 
-    PanelSeparator { foreground: root.barForeground }
-    SectionHeader { text: "SHOW" }
+    SectionLabel { icon: "\uf0ca"; text: "BAR INDICATOR" }
 
-    Column {
+    Segmented {
       width: parent.width
-      spacing: root.sp(6)
-
-      SettingSwitch {
-        width: parent.width
-        label: "Monitors section"
-        checked: root.showMonitors
-        onToggled: root.setDisplay("showMonitors", !root.showMonitors)
-      }
-
-      SettingSwitch {
-        width: parent.width
-        label: "Keys section"
-        checked: root.showKeys
-        onToggled: root.setDisplay("showKeys", !root.showKeys)
-      }
+      columns: 2
+      choices: [
+        { value: "boxes", label: "Boxes" },
+        { value: "text", label: "Text" }
+      ]
+      selected: root.indicator
+      onPicked: function(value) { root.setDisplay("indicator", value) }
     }
-
-    PanelSeparator { foreground: root.barForeground }
-    SectionHeader { text: "SHORTCUTS" }
-
-    // The switches sit closer together than the view's sections.
-    Column {
-      width: parent.width
-      spacing: root.sp(6)
-
-      SettingSwitch {
-        width: parent.width
-        label: "SUPER+1.." + root.pDesktops + " jumps to a desktop"
-        checked: root.pNumbers
-        onToggled: root.pNumbers = !root.pNumbers
-      }
-
-      SettingSwitch {
-        width: parent.width
-        label: "SUPER+TAB cycles"
-        checked: root.pTab
-        onToggled: root.pTab = !root.pTab
-      }
-
-      SettingSwitch {
-        width: parent.width
-        label: "SUPER+scroll cycles"
-        checked: root.pScroll
-        onToggled: root.pScroll = !root.pScroll
-      }
-    }
-
-    PanelSeparator { foreground: root.barForeground }
-    SectionHeader { text: "BAR" }
 
     SettingSwitch {
       width: parent.width
-      label: "Separator between desktops"
-      checked: root.pSeparator
-      onToggled: root.pSeparator = !root.pSeparator
+      label: "Line after the indicator"
+      checked: root.divider
+      onToggled: root.setDisplay("divider", !root.divider)
     }
 
     PanelSeparator { foreground: root.barForeground }
-    SectionHeader { text: "POPUP" }
+    SectionLabel { icon: ""; text: "SWITCH MODE"; tag: "REQUIRES APPLY" }
+
+    // Which way the monitors sit, so the switch moves the right way.
+    Row {
+      width: parent.width
+      spacing: root.sp(6)
+
+      Repeater {
+        model: [
+          { value: "horizontal", label: "Side by side", note: "Horizontal" },
+          { value: "vertical", label: "Stacked", note: "Vertical" }
+        ]
+
+        Rectangle {
+          id: modeCard
+          required property var modelData
+          readonly property bool chosen: root.pMode === modelData.value
+          width: (parent.width - root.sp(6)) / 2
+          implicitHeight: modeContent.implicitHeight + root.sp(14)
+          radius: root.sp(7)
+          color: chosen ? Util.alpha(Color.accent, 0.12) : (modeMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
+          border.width: chosen ? 2 : 1
+          border.color: chosen ? Color.accent : root.tint(0.12)
+
+          Row {
+            id: modeContent
+            anchors.centerIn: parent
+            spacing: root.sp(8)
+
+            // Two little screens, laid out the way the mode describes.
+            Item {
+              width: root.sp(26)
+              height: root.sp(22)
+              anchors.verticalCenter: parent.verticalCenter
+
+              Repeater {
+                model: 2
+
+                Rectangle {
+                  required property int index
+                  readonly property bool wide: modeCard.modelData.value === "horizontal"
+                  x: wide ? index * (parent.width / 2 + root.sp(1)) : 0
+                  y: wide ? 0 : index * (parent.height / 2 + root.sp(1))
+                  width: wide ? parent.width / 2 - root.sp(1) : parent.width
+                  height: wide ? parent.height : parent.height / 2 - root.sp(1)
+                  radius: root.sp(2)
+                  color: modeCard.chosen ? Util.alpha(Color.accent, 0.35) : root.tint(0.12)
+                  border.width: 1
+                  border.color: modeCard.chosen ? Color.accent : root.tint(0.35)
+                }
+              }
+            }
+
+            Column {
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: root.sp(1)
+
+              Text {
+                textFormat: Text.PlainText
+                text: modeCard.modelData.label
+                color: modeCard.chosen ? Color.accent : root.barForeground
+                font.family: Style.font.family
+                font.pixelSize: root.fontSmall
+                font.bold: true
+              }
+
+              Text {
+                textFormat: Text.PlainText
+                text: modeCard.modelData.note
+                color: root.barForeground
+                opacity: 0.55
+                font.family: Style.font.family
+                font.pixelSize: root.fontCaption
+              }
+            }
+          }
+
+          MouseArea {
+            id: modeMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.pMode = modeCard.modelData.value
+          }
+        }
+      }
+    }
+
+    SectionLabel { icon: ""; text: "TRANSITION"; tag: "REQUIRES APPLY" }
+
+    Segmented {
+      width: parent.width
+      columns: 2
+      choices: root.effectChoices
+      selected: root.pEffect
+      onPicked: function(value) { root.pEffect = value }
+    }
+
+    PanelSeparator { foreground: root.barForeground }
+    SectionLabel { icon: ""; text: "POPUP" }
 
     SettingSwitch {
       width: parent.width
@@ -769,46 +1360,57 @@ Panel {
       checked: root.popup
       onToggled: root.setDisplay("popup", !root.popup)
     }
-
-    PanelSeparator { foreground: root.barForeground }
-    SectionHeader { text: "ANIMATION" }
-
-    ChoiceChips {
-      width: parent.width
-      choices: root.animationChoices
-      selected: root.pAnimation
-      onPicked: function(value) { root.pAnimation = value }
-    }
-
-    Caption {
-      width: parent.width
-      text: "Match how the monitors are arranged."
-    }
-
-    PanelSeparator { foreground: root.barForeground }
-
-    Text {
-      textFormat: Text.PlainText
-      text: "\uf013  Re-run setup wizard"
-      color: setupMouse.containsMouse ? Color.accent : root.barForeground
-      font.family: Style.font.family
-      font.pixelSize: root.fontBody
-
-      MouseArea {
-        id: setupMouse
-        anchors.fill: parent
-        anchors.margins: -root.sp(4)
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.runSetup()
-      }
-    }
   }
 
-  component SectionHeader: PanelSectionHeader {
-    foreground: root.barForeground
-    fontFamily: Style.font.family
-    fontSize: root.fontCaption
+  // ===================== pieces =====================
+
+  // Icon, uppercase title, and an optional tag on the right.
+  component SectionLabel: Item {
+    id: section
+    property string icon: ""
+    property string text: ""
+    property string tag: ""
+
+    width: parent ? parent.width : implicitWidth
+    implicitHeight: Math.max(sectionTitle.implicitHeight, sectionIcon.implicitHeight)
+
+    Text {
+      id: sectionIcon
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      width: root.sp(20)
+      textFormat: Text.PlainText
+      text: section.icon
+      color: root.barForeground
+      opacity: 0.65
+      font.family: Style.font.family
+      font.pixelSize: root.fontBody
+    }
+
+    Text {
+      id: sectionTitle
+      anchors.left: sectionIcon.right
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: section.text
+      color: root.barForeground
+      font.family: Style.font.family
+      font.pixelSize: root.fontSmall
+      font.bold: true
+      font.letterSpacing: 1.2
+    }
+
+    Text {
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: section.tag
+      color: root.barForeground
+      opacity: 0.4
+      font.family: Style.font.family
+      font.pixelSize: root.fontCaption
+      font.letterSpacing: 0.8
+    }
   }
 
   component Caption: Text {
@@ -816,57 +1418,234 @@ Panel {
     opacity: 0.45
     wrapMode: Text.WordWrap
     font.family: Style.font.family
-    font.pixelSize: root.fontSmall
+    font.pixelSize: root.fontCaption
   }
 
-  // A dim label on the left and its value in the accent on the right.
-  // An optional note sits right after the label, at full strength.
-  component KeyValue: Item {
-    id: kv
-    property string key: ""
-    property string note: ""
-    property string value: ""
-    implicitHeight: Math.max(kvKey.implicitHeight, kvValue.implicitHeight)
+  // A label on the left and a row of key caps on the right: "SUPER + F".
+  component KeyRow: Rectangle {
+    id: keyRow
+    property string label: ""
+    property string spec: ""
+    property bool open: false
+    signal clicked()
+    readonly property var parts: root.keyParts(spec)
+
+    // A long combination does not fit beside its label; the caps then drop
+    // to a second line under it.
+    readonly property bool wrapped:
+      keyLabel.implicitWidth + capsRow.implicitWidth + root.sp(30) > width
+    implicitHeight: wrapped
+      ? keyLabel.implicitHeight + capsRow.implicitHeight + root.sp(20)
+      : capsRow.implicitHeight + root.sp(14)
+    radius: root.sp(7)
+    color: open ? Util.alpha(Color.accent, 0.1) : (rowMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
+    border.width: 1
+    border.color: open ? Util.alpha(Color.accent, 0.45) : root.tint(0.1)
+
+    MouseArea {
+      id: rowMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: keyRow.clicked()
+    }
 
     Text {
-      id: kvKey
+      id: keyLabel
       anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      width: Math.min(implicitWidth,
-        kv.width - kvValue.width - kvNote.width - root.sp(16))
+      anchors.leftMargin: root.sp(10)
+      anchors.top: keyRow.wrapped ? parent.top : undefined
+      anchors.topMargin: root.sp(7)
+      anchors.verticalCenter: keyRow.wrapped ? undefined : parent.verticalCenter
       textFormat: Text.PlainText
-      text: kv.key
-      color: root.barForeground
-      opacity: 0.75
-      elide: Text.ElideRight
-      font.family: Style.font.family
-      font.pixelSize: root.fontSmall
-    }
-
-    Text {
-      id: kvNote
-      anchors.left: kvKey.right
-      anchors.leftMargin: kv.note !== "" ? root.sp(8) : 0
-      anchors.verticalCenter: parent.verticalCenter
-      width: kv.note !== "" ? implicitWidth : 0
-      textFormat: Text.PlainText
-      text: kv.note
+      text: keyRow.label
       color: root.barForeground
       font.family: Style.font.family
-      font.pixelSize: root.fontSmall
-      font.bold: true
+      font.pixelSize: root.fontBody
     }
 
-    Text {
-      id: kvValue
+    Row {
+      id: capsRow
       anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      textFormat: Text.PlainText
-      text: kv.value
-      color: Color.accent
-      font.family: Style.font.family
-      font.pixelSize: root.fontSmall
-      font.bold: true
+      anchors.rightMargin: root.sp(8)
+      anchors.bottom: keyRow.wrapped ? parent.bottom : undefined
+      anchors.bottomMargin: root.sp(7)
+      anchors.verticalCenter: keyRow.wrapped ? undefined : parent.verticalCenter
+      spacing: root.sp(4)
+
+      Repeater {
+        model: keyRow.parts
+
+        Row {
+          id: capGroup
+          required property string modelData
+          required property int index
+          spacing: root.sp(4)
+
+          Text {
+            visible: capGroup.index > 0
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: "+"
+            color: root.barForeground
+            opacity: 0.45
+            font.family: Style.font.family
+            font.pixelSize: root.fontSmall
+          }
+
+          Rectangle {
+            width: Math.max(root.sp(22), capText.implicitWidth + root.sp(14))
+            height: capText.implicitHeight + root.sp(8)
+            radius: root.sp(5)
+            color: root.tint(0.08)
+            border.width: 1
+            border.color: root.tint(0.28)
+
+            Text {
+              id: capText
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: capGroup.modelData
+              color: root.barForeground
+              font.family: Style.font.family
+              font.pixelSize: root.fontSmall
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // A key row that opens into an editor: modifier buttons, and a button that
+  // waits for the plain key. The edit is staged like the rest.
+  component KeyEditor: Column {
+    id: editor
+    property string which: ""
+    property string label: ""
+    readonly property string spec: which === "toggle" ? root.pToggle : root.pSend
+    readonly property bool open: root.keyEdit === which
+    readonly property bool changed: which === "toggle" ? root.pToggle !== root.toggleKey : root.pSend !== root.sendKey
+
+    spacing: root.sp(4)
+
+    KeyRow {
+      width: parent.width
+      label: editor.label + (editor.changed ? " \u2022" : "")
+      spec: editor.spec
+      open: editor.open
+      onClicked: {
+        root.capturing = false
+        root.keyError = ""
+        root.keyEdit = editor.open ? "" : editor.which
+      }
+    }
+
+    Rectangle {
+      width: parent.width
+      visible: editor.open
+      implicitHeight: editorBody.implicitHeight + root.sp(16)
+      radius: root.sp(7)
+      color: root.tint(0.03)
+      border.width: 1
+      border.color: root.tint(0.1)
+
+      Column {
+        id: editorBody
+        anchors.fill: parent
+        anchors.margins: root.sp(8)
+        spacing: root.sp(7)
+
+        Row {
+          spacing: root.sp(5)
+
+          Repeater {
+            model: root.modifierNames
+
+            Rectangle {
+              id: modChip
+              required property string modelData
+              readonly property bool on: root.keyModifiers(editor.spec).indexOf(modelData) >= 0
+              width: modText.implicitWidth + root.sp(16)
+              height: modText.implicitHeight + root.sp(10)
+              radius: root.sp(5)
+              color: on ? Util.alpha(Color.accent, 0.15) : (modMouse.containsMouse ? root.tint(0.1) : root.tint(0.05))
+              border.width: on ? 2 : 1
+              border.color: on ? Color.accent : root.tint(0.2)
+
+              Text {
+                id: modText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: modChip.modelData
+                color: modChip.on ? Color.accent : root.barForeground
+                font.family: Style.font.family
+                font.pixelSize: root.fontSmall
+                font.bold: modChip.on
+              }
+
+              MouseArea {
+                id: modMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.toggleModifier(editor.which, modChip.modelData)
+              }
+            }
+          }
+        }
+
+        Item {
+          width: parent.width
+          implicitHeight: keyButton.implicitHeight
+
+          Text {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: "Key"
+            color: root.barForeground
+            opacity: 0.7
+            font.family: Style.font.family
+            font.pixelSize: root.fontSmall
+          }
+
+          Rectangle {
+            id: keyButton
+            anchors.right: parent.right
+            implicitWidth: keyButtonText.implicitWidth + root.sp(22)
+            implicitHeight: keyButtonText.implicitHeight + root.sp(10)
+            width: Math.max(implicitWidth, root.sp(110))
+            height: implicitHeight
+            radius: root.sp(5)
+            color: root.capturing ? Util.alpha(Color.accent, 0.15) : (keyMouse.containsMouse ? root.tint(0.1) : root.tint(0.06))
+            border.width: root.capturing ? 2 : 1
+            border.color: root.capturing ? Color.accent : root.tint(0.28)
+
+            Text {
+              id: keyButtonText
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: root.capturing ? "Press a key..." : root.keyBase(editor.spec)
+              color: root.capturing ? Color.accent : root.barForeground
+              font.family: Style.font.family
+              font.pixelSize: root.fontSmall
+              font.bold: !root.capturing
+            }
+
+            MouseArea {
+              id: keyMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                root.keyError = ""
+                root.capturing = true
+                keyKeeper.forceActiveFocus()
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -879,12 +1658,12 @@ Panel {
     property bool active: true
     signal clicked()
 
-    implicitWidth: root.sp(24)
-    implicitHeight: root.sp(24)
-    radius: width / 2
-    color: stepMouse.containsMouse && step.active ? Util.alpha(Color.accent, 0.2) : "transparent"
+    implicitWidth: root.sp(26)
+    implicitHeight: root.sp(26)
+    radius: root.sp(7)
+    color: stepMouse.containsMouse && step.active ? Util.alpha(Color.accent, 0.2) : root.tint(0.06)
     border.width: 1
-    border.color: stepMouse.containsMouse && step.active ? Color.accent : Util.alpha(root.barForeground, 0.25)
+    border.color: stepMouse.containsMouse && step.active ? Color.accent : root.tint(0.25)
     opacity: step.active ? 1.0 : 0.4
 
     Text {
@@ -911,38 +1690,48 @@ Panel {
     }
   }
 
-  // A wrapping row of text choices; the selected one is accent, bold and
-  // underlined. choices: [{ value, label }].
-  component ChoiceChips: Flow {
-    id: chips
+  // Boxed choices in an even grid; the chosen one is outlined and tinted in
+  // the accent. choices: [{ value, label }].
+  component Segmented: Grid {
+    id: segmented
     property var choices: []
     property var selected
     signal picked(var value)
 
-    spacing: root.sp(10)
+    spacing: root.sp(6)
+    readonly property real cellWidth: (width - (columns - 1) * spacing) / columns
 
     Repeater {
-      model: chips.choices
+      model: segmented.choices
 
-      Text {
+      Rectangle {
+        id: choice
         required property var modelData
-        readonly property bool chosen: chips.selected === modelData.value
-        textFormat: Text.PlainText
-        text: modelData.label
-        color: chosen ? Color.accent : root.barForeground
-        font.family: Style.font.family
-        font.pixelSize: root.fontSmall
-        font.bold: chosen
-        font.underline: chosen
-        opacity: chosen || chipMouse.containsMouse ? 1.0 : 0.55
+        readonly property bool chosen: segmented.selected === modelData.value
+        width: segmented.cellWidth
+        implicitHeight: choiceText.implicitHeight + root.sp(12)
+        radius: root.sp(7)
+        color: chosen ? Util.alpha(Color.accent, 0.12) : (choiceMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
+        border.width: chosen ? 2 : 1
+        border.color: chosen ? Color.accent : root.tint(0.12)
+
+        Text {
+          id: choiceText
+          anchors.centerIn: parent
+          textFormat: Text.PlainText
+          text: choice.modelData.label
+          color: choice.chosen ? Color.accent : root.barForeground
+          font.family: Style.font.family
+          font.pixelSize: root.fontSmall
+          font.bold: choice.chosen
+        }
 
         MouseArea {
-          id: chipMouse
+          id: choiceMouse
           anchors.fill: parent
-          anchors.margins: -root.sp(3)
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
-          onClicked: chips.picked(parent.modelData.value)
+          onClicked: segmented.picked(choice.modelData.value)
         }
       }
     }
