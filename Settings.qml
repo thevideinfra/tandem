@@ -315,27 +315,47 @@ Panel {
     return out
   }
 
-  // Windows open on a desktop, summed over its workspaces.
-  function windowsOn(desk) {
+  // The windows open on a desktop, across its workspaces: { appId, title }.
+  function windowsOfDesk(desk) {
     var ids = workspacesOf(desk)
-    var total = 0
-    var list = Hyprland.workspaces.values
+    var out = []
+    var list = Hyprland.toplevels ? Hyprland.toplevels.values : []
     for (var i = 0; i < list.length; i++) {
-      var w = list[i]
-      if (ids.indexOf(w.id) >= 0 && w.toplevels) total += w.toplevels.values.length
+      var t = list[i]
+      if (!t || !t.workspace || ids.indexOf(t.workspace.id) < 0) continue
+      var ipc = t.lastIpcObject || {}
+      out.push({
+        appId: String(t.wayland && t.wayland.appId ? t.wayland.appId : (ipc["class"] || "")),
+        title: String(t.title || "")
+      })
     }
-    return total
+    return out
   }
 
-  // "Workspaces 1, 2" on the left of a desktop row, "2 windows" on the right.
+  // "WS 1, 2": the workspaces a desktop owns, one per monitor.
   function workspaceText(desk) {
-    var ids = workspacesOf(desk)
-    return (ids.length === 1 ? "Workspace " : "Workspaces ") + ids.join(", ")
+    return "WS " + workspacesOf(desk).join(", ")
   }
 
-  function windowText(desk) {
-    var n = windowsOn(desk)
-    return n === 0 ? "No windows" : n + (n === 1 ? " window" : " windows")
+  // The app's icon, through its desktop entry where there is one: a window
+  // class such as "brave-origin" is not an icon name by itself. Falls back to
+  // the class as an icon name, then to the shell's generic icon.
+  readonly property var appLibrary: root.bar && root.bar.shell ? root.bar.shell.appLibrary : null
+
+  function iconFor(appId) {
+    var id = String(appId || "")
+    var name = id
+    try {
+      var entry = DesktopEntries.byId(id)
+      if (!entry) {
+        var guess = DesktopEntries.heuristicLookup(id)
+        var a = id.toLowerCase(), b = guess ? String(guess.id || "").toLowerCase() : ""
+        if (guess && b !== "" && (a === b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1)) entry = guess
+      }
+      if (entry && entry.icon) name = String(entry.icon)
+    } catch (e) { }
+    if (root.appLibrary) return root.appLibrary.iconSource(name)
+    return Quickshell.iconPath(name, true)
   }
 
   // Which workspace a monitor shows on the desktop you are on.
@@ -1025,7 +1045,7 @@ Panel {
           required property var modelData
           readonly property bool current: modelData.i + 1 === root.currentDesk
           width: parent.width
-          implicitHeight: nameField.implicitHeight + infoText.implicitHeight + root.sp(14)
+          implicitHeight: nameField.implicitHeight + infoLine.implicitHeight + root.sp(15)
           radius: root.sp(7)
           color: current ? Util.alpha(Color.accent, 0.12) : root.tint(0.05)
           border.width: 1
@@ -1133,33 +1153,89 @@ Panel {
             Keys.onEscapePressed: keyCatcher.forceActiveFocus()
           }
 
-          Text {
-            id: infoText
+          // Open windows as icons, with the workspaces on the right. Hover an
+          // icon for the window's title.
+          Item {
+            id: infoLine
             anchors.left: nameField.left
-            anchors.leftMargin: root.sp(2)
-            anchors.top: nameField.bottom
-            anchors.topMargin: root.sp(2)
-            textFormat: Text.PlainText
-            text: root.workspaceText(deskRow.modelData.i + 1)
-            color: root.barForeground
-            opacity: 0.5
-            font.family: Style.font.family
-            font.pixelSize: root.fontCaption
-          }
-
-          // Window count on the right, so it reads as its own fact. Accent
-          // when the desktop has windows in it.
-          Text {
-            readonly property int count: root.windowsOn(deskRow.modelData.i + 1)
             anchors.right: nameField.right
-            anchors.rightMargin: root.sp(2)
-            anchors.baseline: infoText.baseline
-            textFormat: Text.PlainText
-            text: root.windowText(deskRow.modelData.i + 1)
-            color: count > 0 ? Color.accent : root.barForeground
-            opacity: count > 0 ? 0.85 : 0.5
-            font.family: Style.font.family
-            font.pixelSize: root.fontCaption
+            anchors.top: nameField.bottom
+            anchors.topMargin: root.sp(4)
+            implicitHeight: root.sp(23)
+            height: implicitHeight
+
+            readonly property var windows: root.windowsOfDesk(deskRow.modelData.i + 1)
+            readonly property int shown: Math.min(windows.length, 8)
+
+            Text {
+              id: infoText
+              anchors.right: parent.right
+              anchors.rightMargin: root.sp(2)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: root.workspaceText(deskRow.modelData.i + 1)
+              color: root.barForeground
+              opacity: 0.5
+              font.family: Style.font.family
+              font.pixelSize: root.fontCaption
+            }
+
+            Text {
+              visible: infoLine.windows.length === 0
+              anchors.left: parent.left
+              anchors.leftMargin: root.sp(2)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "No windows"
+              color: root.barForeground
+              opacity: 0.45
+              font.family: Style.font.family
+              font.pixelSize: root.fontCaption
+            }
+
+            Row {
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: root.sp(5)
+
+              Repeater {
+                model: infoLine.windows.slice(0, infoLine.shown)
+
+                Image {
+                  id: appIcon
+                  required property var modelData
+                  width: root.sp(21)
+                  height: root.sp(21)
+                  sourceSize: Qt.size(width * 2, height * 2)
+                  fillMode: Image.PreserveAspectFit
+                  smooth: true
+                  source: root.iconFor(modelData.appId)
+
+                  MouseArea {
+                    id: iconMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                  }
+
+                  PanelToolTip {
+                    visible: iconMouse.containsMouse
+                    text: appIcon.modelData.title !== "" ? appIcon.modelData.title : appIcon.modelData.appId
+                    fontFamily: Style.font.family
+                  }
+                }
+              }
+
+              Text {
+                visible: infoLine.windows.length > infoLine.shown
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: "+" + (infoLine.windows.length - infoLine.shown)
+                color: root.barForeground
+                opacity: 0.6
+                font.family: Style.font.family
+                font.pixelSize: root.fontCaption
+              }
+            }
           }
         }
       }
@@ -1214,77 +1290,6 @@ Panel {
     }
 
     MonitorMap { width: parent.width }
-
-    Column {
-      width: parent.width
-      spacing: root.sp(5)
-
-      Repeater {
-        model: root.detected
-
-        Rectangle {
-          id: monitorRow
-          required property var modelData
-          required property int index
-          width: parent.width
-          implicitHeight: monitorName.implicitHeight + root.sp(16)
-          radius: root.sp(7)
-          color: root.tint(0.05)
-          border.width: 1
-          border.color: root.tint(0.1)
-
-          Text {
-            id: monitorIcon
-            anchors.left: parent.left
-            anchors.leftMargin: root.sp(10)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: ""
-            color: root.barForeground
-            opacity: 0.7
-            font.family: Style.font.family
-            font.pixelSize: root.fontTitle
-          }
-
-          Text {
-            id: monitorName
-            anchors.left: monitorIcon.right
-            anchors.leftMargin: root.sp(10)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: monitorRow.modelData.name
-            color: root.barForeground
-            font.family: Style.font.family
-            font.pixelSize: root.fontBody
-            font.bold: true
-          }
-
-          Text {
-            anchors.left: monitorName.right
-            anchors.leftMargin: root.sp(10)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: root.monitorPosition(monitorRow.index)
-            color: root.barForeground
-            opacity: 0.55
-            font.family: Style.font.family
-            font.pixelSize: root.fontSmall
-          }
-
-          Text {
-            anchors.right: parent.right
-            anchors.rightMargin: root.sp(10)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: monitorRow.modelData.width + " × " + monitorRow.modelData.height
-            color: root.barForeground
-            opacity: 0.7
-            font.family: Style.font.family
-            font.pixelSize: root.fontSmall
-          }
-        }
-      }
-    }
   }
 
   // The monitors to scale, as they sit on the desk, each with the workspace
@@ -1294,7 +1299,7 @@ Panel {
     readonly property var mons: root.detected
     readonly property int pad: root.sp(8)
 
-    height: root.sp(112)
+    height: root.sp(124)
     radius: root.sp(7)
     color: root.tint(0.03)
     border.width: 1
@@ -1351,9 +1356,8 @@ Panel {
 
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: tile.ws > 0
             textFormat: Text.PlainText
-            text: "ws " + tile.ws
+            text: tile.modelData.width + "\u00d7" + tile.modelData.height
             color: root.barForeground
             opacity: 0.6
             font.family: Style.font.family
