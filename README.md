@@ -72,38 +72,40 @@ One key answer gives both binds: `F` becomes `SUPER + F` to switch and
 `SUPER + SHIFT + F` to carry a window.
 
 <p>
-  <img src="assets/settings-panel.png" alt="The Tandem panel: desktop count, a name field per desktop with the current one marked in the accent colour, the monitors with their positions, and the keys" width="324">
-  <img src="assets/settings-view.png" alt="The panel's settings view: density, font size, switches for the monitors and keys sections, the key options, the separator, the animation and the setup wizard" width="324">
+  <img src="assets/panel-desktops.png" alt="The Desktops page: the desktop count, a named row per desktop with the current one marked ACTIVE and the others a Switch button, and the monitors with their positions" width="250">
+  <img src="assets/panel-keybinds.png" alt="The Keybinds page: the switch and send keys as key caps, switches for the extra binds, and the setup wizard" width="250">
+  <img src="assets/panel-styling.png" alt="The Styling page: density, font size, switch mode, transition and the pager popup" width="250">
 </p>
 
-The **settings panel** (two-monitor icon, right of the bar) covers everything the
-wizard does except the monitor order, which it lists read-only. Its main view
-holds:
+The **panel** (two-monitor icon, right of the bar) has three pages, switched
+by the tabs along the bottom or with the left and right arrow keys. It follows
+your Omarchy theme: the accent colour marks the current desktop and the chosen
+options, and everything else is a tint of the panel's own text colour.
 
-- `−` / `+` for the desktop count, and a text field per desktop name. The
-  desktop you are on is marked in your theme's accent colour.
-- The monitors, each with where it sits (Top / Bottom when stacked, Left /
-  Right side by side), and the switch and send keys. These are set in the
-  wizard.
+- **Desktops** — `−` / `+` for the desktop count and a name field per desktop.
+  The one you are on is marked `ACTIVE` in the accent colour; the others have
+  a **Switch** button. Below are the monitors, each with where it sits (Top /
+  Bottom when stacked, Left / Right side by side) and its resolution.
+- **Keybinds** — the switch and send keys, shown as key caps and set in the
+  wizard, switches for `SUPER + 1..n`, `SUPER + TAB` and `SUPER + scroll`, and
+  a button that re-runs the setup wizard.
+- **Styling** —
+  - **Density** (**Compact**, **Normal** or **Roomy**) and **font size**
+    (**Small**, **Normal** or **Large**).
+  - **Switch mode**: whether the monitors sit side by side or stacked, so a
+    switch moves the way they are arranged.
+  - **Transition**: slide, fade, slide and fade, or Hyprland's own.
+  - A **pager popup** switch, off by default: a small card in the middle of
+    each screen after a desktop switch. It has one square per desktop, named
+    as in the bar, with the current one marked and an arrow towards where you
+    went. It follows the switch mode — sideways for side by side, stacked
+    for stacked.
 
-The ⚙ in the panel header opens its settings:
-
-- A **Compact**, **Normal** or **Comfortable** layout and a **Small**,
-  **Normal** or **Large** font size, and switches to hide the monitors and
-  keys sections. These save as you click.
-- A switch per key option — `SUPER+1..n`, `SUPER+TAB`, `SUPER+scroll` — and
-  one for the `|` separator. Click anywhere on the row.
-- A **pager popup** switch, off by default: a small card in the middle of
-  each screen after a desktop switch. It has one square per desktop, named as
-  in the bar, with the current one marked and an arrow towards where you
-  went. It follows the animation — sideways for `slide`, up and down for
-  `slidevert`. It saves as you click.
-- The switching animation.
-- Re-run setup wizard.
-
-Desktop, name, key and animation edits are **staged** until you press Apply —
-each write regenerates and reloads the Hyprland config, too disruptive to do
-per click. Revert discards staged edits; so does closing the panel.
+Desktop, name, key, switch-mode and transition edits are **staged**. A banner
+appears above the tabs with how many are pending, and **Apply & reload** writes
+them: each write regenerates and reloads the Hyprland config, too disruptive
+to do per click. **Revert** discards them; so does closing the panel. Density,
+font size and the popup only change how things look, so they save as you click.
 
 ## Updating
 
@@ -166,12 +168,10 @@ bar hands a widget every key on its entry except `id`:
   "numbers":  true,
   "tab":      true,
   "scroll":   true,
-  "separator": false,
   "animation": "slide",
+  "mode":     "horizontal",
   "density":  "normal",
   "fontSize": "normal",
-  "showMonitors": true,
-  "showKeys": true,
   "popup": false }
 ```
 
@@ -181,22 +181,26 @@ bar hands a widget every key on its entry except `id`:
 - `numbers` / `tab` / `scroll` — the optional binds: `SUPER+1`..`n`,
   `SUPER+TAB`, and `SUPER+scroll`. Set one `false` to leave that key to
   Omarchy.
-- `separator` — draws a `|` between bar entries.
 - `animation` — how a switch is drawn: `slide`, `slidevert`, `fade`,
   `slidefade`, `slidefadevert`, or `none` to keep Hyprland's own workspace
   animation. Match the direction the monitors are arranged in — `slide` for
-  side by side, `slidevert` for stacked.
+  side by side, `slidevert` for stacked. The panel offers this as a switch
+  mode plus a transition and joins them.
+- `mode` — `horizontal` (side by side) or `vertical` (stacked). The pager
+  popup follows it, and the panel uses it for the transitions that have no
+  direction of their own (`fade`, `none`). Omit it and it comes from
+  `animation`.
 - `toggle` / `send` — the switch key and the carry-a-window key. The wizard
   asks for one key and derives both (`F` gives `SUPER + F` and
   `SUPER + SHIFT + F`); set them here to use unrelated keys.
-- `density` / `fontSize` — the settings panel's own layout: `compact`,
-  `normal` or `comfortable`, and `small`, `normal` or `large`. They change
-  nothing in Hyprland or the bar.
-- `showMonitors` / `showKeys` — show the panel's MONITORS and KEYS sections.
+- `density` / `fontSize` — the panel's own layout: `compact`, `normal` or
+  `roomy` (`comfortable` is still read as `roomy`), and `small`, `normal` or
+  `large`. They change nothing in Hyprland or the bar.
 - `popup` — show the pager popup after a desktop switch. Off by default.
 
-`labels` and `separator` are cosmetic, so changing only those skips the
-Hyprland regenerate-and-reload.
+`labels`, `mode`, `density`, `fontSize` and `popup` are display settings that
+the panel and the bar widget read live from `shell.json`, so changing only
+those skips the Hyprland regenerate-and-reload and needs no shell restart.
 
 Edit by hand and re-run `tandem-apply`, or use the panel or wizard.
 

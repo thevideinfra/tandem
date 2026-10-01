@@ -179,8 +179,10 @@ Defined in **none**: `bar.active`, `urgent`. `WidgetButton`'s default
 `activeColor` resolves to `bar.active`, falls through to a hardcoded red, and
 looks theme-aware while being identical on every theme.
 
-Tandem uses `accent` for the active desktop, `muted` for the separator, and
-`foreground` at 0.55 for inactive, so all three stay distinguishable.
+Tandem uses `accent` for the active desktop and the chosen options, and tints
+of the bar foreground (alpha 0.05-0.3) for tiles, borders and inactive boxes.
+Text on an accent fill is black or white by the accent's luminance, since no
+single theme colour is readable on every accent.
 
 Audit a role before trusting it:
 
