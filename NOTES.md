@@ -129,6 +129,26 @@ per monitor. `WlrLayer.Overlay`, `keyboardFocus: None` and an empty `mask:
 Region {}` make it visual-only. It needs no manifest kind; plugin QML is not
 sandboxed.
 
+**Capture a key from a press, choose the modifiers with buttons.** Pressing
+SUPER + the key while the panel has focus is taken by the compositor's own
+bind before the panel sees it. The panel captures only the plain key (an Item
+that takes focus, so the press reaches it first) and picks SUPER, SHIFT, CTRL
+and ALT with toggles. Qt key codes map to Hyprland names (`Qt.Key_Comma` is
+`comma`, `Qt.Key_PageUp` is `Prior`); a key with no entry is refused rather
+than guessed.
+
+**Window icons: desktop entry first.** A window class such as `brave-origin`
+is not an icon name. Resolve it through `DesktopEntries.byId` (then a guarded
+`heuristicLookup`, accepted only when the ids are related, since it answers
+with some application rather than nothing) and pass the entry's icon to
+`bar.shell.appLibrary.iconSource`, which also searches the on-disk icon index.
+`Hyprland.toplevels` carries each window's `workspace`, `title` and
+`wayland.appId`.
+
+**A panel can open overlay windows on every screen.** `Variants` over
+`Quickshell.screens` with a `PanelWindow` per screen (overlay layer, no
+keyboard focus, empty `mask`) is how Identify names each monitor on itself.
+
 **Panel width has to follow the text, not just the spacing.** `Style.space`
 scales with the shell's base size but text does not scale the same way, so a
 width picked in spacing units truncates labels under another theme. Measure

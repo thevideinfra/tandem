@@ -72,26 +72,39 @@ One key answer gives both binds: `F` becomes `SUPER + F` to switch and
 `SUPER + SHIFT + F` to carry a window.
 
 <p>
-  <img src="assets/panel-desktops.png" alt="The Desktops page: the desktop count, a named row per desktop with the current one marked ACTIVE and the others a Switch button, and the monitors with their positions" width="250">
+  <img src="assets/panel-desktops.png" alt="The Desktops page: the desktop count, a named row per desktop with app icons for its open windows and the workspaces it owns, and the monitors drawn to scale" width="250">
   <img src="assets/panel-keybinds.png" alt="The Keybinds page: the switch and send keys as key caps, switches for the extra binds, and the setup wizard" width="250">
-  <img src="assets/panel-styling.png" alt="The Styling page: density, font size, switch mode, transition and the pager popup" width="250">
+  <img src="assets/panel-styling.png" alt="The Styling page: density, font size, bar indicator, switch mode, transition and the pager popup" width="250">
 </p>
 
 The **panel** (two-monitor icon, right of the bar) has three pages, switched
-by the tabs along the bottom or with the left and right arrow keys. It follows
-your Omarchy theme: the accent colour marks the current desktop and the chosen
-options, and everything else is a tint of the panel's own text colour.
+by the tabs along the bottom or with the left and right arrow keys. The header
+shows the version and links to this repository. The panel follows your Omarchy
+theme: the accent colour marks the current desktop and the chosen options, and
+everything else is a tint of the panel's own text colour.
 
-- **Desktops** — `−` / `+` for the desktop count and a name field per desktop.
-  The one you are on is marked `ACTIVE` in the accent colour; the others have
-  a **Switch** button. Below are the monitors, each with where it sits (Top /
-  Bottom when stacked, Left / Right side by side) and its resolution.
-- **Keybinds** — the switch and send keys, shown as key caps and set in the
-  wizard, switches for `SUPER + 1..n`, `SUPER + TAB` and `SUPER + scroll`, and
-  a button that re-runs the setup wizard.
+- **Desktops** —
+  - `−` / `+` for the desktop count and a name field per desktop.
+  - The one you are on is marked `ACTIVE` in the accent colour; the others have
+    a **Switch** button.
+  - Under each name, the apps with windows open on that desktop as icons (hover
+    one for the window's title), and the workspaces the desktop owns, such as
+    `WS 1, 2`.
+  - **Monitors**: a map of your screens to scale, each with its name and
+    resolution and the one with focus outlined. **Identify** shows every
+    monitor's name, position and workspace on its own screen for a moment.
+- **Keybinds** —
+  - The switch and send keys, as key caps. Click a row to change it: toggle the
+    modifiers, then press the key. The send key follows the switch key until you
+    set it to something else.
+  - Switches for `SUPER + 1..n`, `SUPER + TAB` and `SUPER + scroll`, and a
+    button that re-runs the setup wizard for the rest.
 - **Styling** —
   - **Density** (**Compact**, **Normal** or **Roomy**) and **font size**
     (**Small**, **Normal** or **Large**).
+  - **Bar indicator**: **Boxes** (each desktop in a rounded box, the current one
+    filled with the accent) or **Text**, and a switch for a thin line after the
+    last desktop that sets it apart from the icons beside it.
   - **Switch mode**: whether the monitors sit side by side or stacked, so a
     switch moves the way they are arranged.
   - **Transition**: slide, fade, slide and fade, or Hyprland's own.
@@ -105,7 +118,8 @@ Desktop, name, key, switch-mode and transition edits are **staged**. A banner
 appears above the tabs with how many are pending, and **Apply & reload** writes
 them: each write regenerates and reloads the Hyprland config, too disruptive
 to do per click. **Revert** discards them; so does closing the panel. Density,
-font size and the popup only change how things look, so they save as you click.
+font size, the bar indicator and the popup only change how things look, so they
+save as you click.
 
 ## Updating
 
@@ -132,7 +146,7 @@ The repo root is the plugin, as `omarchy plugin add` requires.
 ```
 manifest.json     bar-widget plugin, allowMultiple
 BarWidget.qml     entry point; picks a role from its bar entry
-Indicator.qml     the D1/D2 indicator
+Indicator.qml     the desktop indicator in the bar (boxes or text)
 Settings.qml      the settings panel
 TandemIcon.qml    the two-monitor bar icon
 DesktopPopup.qml  the pager popup shown after a switch
@@ -172,6 +186,8 @@ bar hands a widget every key on its entry except `id`:
   "mode":     "horizontal",
   "density":  "normal",
   "fontSize": "normal",
+  "indicator": "boxes",
+  "divider":  false,
   "popup": false }
 ```
 
@@ -197,8 +213,12 @@ bar hands a widget every key on its entry except `id`:
   `roomy` (`comfortable` is still read as `roomy`), and `small`, `normal` or
   `large`. They change nothing in Hyprland or the bar.
 - `popup` — show the pager popup after a desktop switch. Off by default.
+- `indicator` — how the bar shows the desktops: `boxes` (the default) or
+  `text`.
+- `divider` — draw a thin line after the last desktop in the bar. Off by
+  default.
 
-`labels`, `mode`, `density`, `fontSize` and `popup` are display settings that
+`labels`, `mode`, `density`, `fontSize`, `popup`, `indicator` and `divider` are display settings that
 the panel and the bar widget read live from `shell.json`, so changing only
 those skips the Hyprland regenerate-and-reload and needs no shell restart.
 
