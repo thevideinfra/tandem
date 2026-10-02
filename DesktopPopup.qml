@@ -16,6 +16,7 @@ Item {
   id: root
 
   property var screen: null
+  property color accent: Color.accent
   property int count: 2
   property var labels: []          // custom desktop names; missing ones read D1..Dn
   property bool vertical: false
@@ -167,9 +168,9 @@ Item {
             width: root.cellW
             height: root.cellH
             radius: Style.space(7)
-            color: Util.alpha(Color.accent, 0.3)
+            color: Util.alpha(root.accent, 0.3)
             border.width: 2
-            border.color: Color.accent
+            border.color: root.accent
             Behavior on x { enabled: root.slide; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             Behavior on y { enabled: root.slide; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
@@ -177,7 +178,7 @@ Item {
               anchors.centerIn: parent
               textFormat: Text.PlainText
               text: root.labelFor(root.marker + 1)
-              color: Color.accent
+              color: root.accent
               font.family: Style.font.family
               font.pixelSize: Style.font.title
               font.bold: true
@@ -188,7 +189,7 @@ Item {
         Text {
           textFormat: Text.PlainText
           text: root.arrowGlyph
-          color: Color.accent
+          color: root.accent
           font.family: Style.font.family
           font.pixelSize: Style.font.heading
           width: root.vertical ? root.lane : root.arrowSlot

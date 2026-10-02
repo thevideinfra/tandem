@@ -19,9 +19,11 @@
 #       indicator (boxes|text; how the bar shows the desktops),
 #       divider (bool; a thin line after the last desktop in the bar),
 #       windowIcons (bool; app icons for what is open, in the bar),
-#       clickToSwitch (bool; clicking a desktop in the bar goes to it).
+#       clickToSwitch (bool; clicking a desktop in the bar goes to it),
+#       accent (theme|blue|cyan|green|magenta|yellow|red|orange: the colour
+#       Tandem highlights with; "theme" is the theme's own accent).
 #
-# labels, density, fontSize, mode, popup, indicator, divider, windowIcons and clickToSwitch are display settings: the panel and
+# labels, density, fontSize, mode, popup, indicator, divider, windowIcons, clickToSwitch and accent are display settings: the panel and
 # the bar widget read them live from shell.json, so changing only those never
 # touches Hyprland.
 set -euo pipefail
@@ -65,6 +67,7 @@ get)
       indicator: (if has("indicator") and .indicator != null then .indicator else "boxes" end),
       divider:  (if has("divider") and .divider != null then .divider else false end),
       windowIcons: (if has("windowIcons") and .windowIcons != null then .windowIcons else false end),
+      accent:   (if has("accent") and .accent != null then .accent else "theme" end),
       clickToSwitch: (if has("clickToSwitch") and .clickToSwitch != null then .clickToSwitch else true end),
       monitors: (if has("monitors") and .monitors != null then .monitors else null end),
       labels:   (if has("labels")   and .labels   != null then .labels   else null end),
@@ -113,6 +116,13 @@ set | set-json)
     compact | normal | roomy) ;;
     comfortable) value=roomy ;;   # the old name
     *) echo "tandem-config: density must be compact, normal or roomy" >&2; return 1 ;;
+    esac
+    json=$(jq -nc --arg v "$value" '$v')
+    ;;
+  accent)
+    case "$value" in
+    theme | blue | cyan | green | magenta | yellow | red | orange) ;;
+    *) echo "tandem-config: accent must be theme, blue, cyan, green, magenta, yellow, red or orange" >&2; return 1 ;;
     esac
     json=$(jq -nc --arg v "$value" '$v')
     ;;
@@ -186,7 +196,7 @@ set | set-json)
 
   # Display settings are read live by the panel and the bar widget, so there
   # is nothing to regenerate or reload.
-  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider", "windowIcons", "clickToSwitch"] | length' <<<"$patch") == 0 ]]; then
+  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider", "windowIcons", "clickToSwitch", "accent"] | length' <<<"$patch") == 0 ]]; then
     echo "tandem-config: appearance updated"
     exit 0
   fi

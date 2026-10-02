@@ -221,6 +221,7 @@ Panel {
   property bool divider: false
   property bool windowIcons: false
   property bool clickToSwitch: true
+  property string accentChoice: "theme"
   readonly property real densityScale:
     density === "compact" ? 0.61 : (density === "roomy" ? 0.83 : 0.71)
   // Text shrinks half as fast as spacing so compact stays readable, then the
@@ -248,6 +249,14 @@ Panel {
     page = pages[((index + step) % pages.length + pages.length) % pages.length].id
   }
 
+  TandemAccent {
+    id: accentSource
+    choice: root.accentChoice
+  }
+
+  // The colour Tandem highlights with: the theme accent, or a chosen palette colour.
+  readonly property color accent: accentSource.value
+
   // Style.space scaled by the chosen density.
   function sp(px) {
     return Style.space(px * densityScale)
@@ -260,6 +269,12 @@ Panel {
   function setDisplay(key, value) {
     root[key] = value
     Quickshell.execDetached([root.pluginDir + "/tandem-config", "set", key, String(value)])
+  }
+
+  // Saved under the key "accent"; the property is named for what it holds.
+  function setAccent(name) {
+    accentChoice = name
+    Quickshell.execDetached([root.pluginDir + "/tandem-config", "set", "accent", name])
   }
 
   function showDesk(index) {
@@ -392,7 +407,7 @@ Panel {
             anchors.horizontalCenter: parent.horizontalCenter
             textFormat: Text.PlainText
             text: identifyWindow.modelData.name
-            color: Color.accent
+            color: root.accent
             font.family: Style.font.family
             font.pixelSize: Style.font.displayLarge
             font.bold: true
@@ -477,6 +492,7 @@ Panel {
       divider = data.divider === true
       windowIcons = data.windowIcons === true
       clickToSwitch = data.clickToSwitch !== false
+      accentChoice = data.accent || "theme"
       detected = data.detected || []
       monitorNames = data.monitors || detected.map(function(m) { return m.name })
       savedLabels = normalizeLabels(data.labels, data.desktops)
@@ -613,9 +629,13 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
+    // Less padding than the shell's popups, to save space; the width gives up
+    // the same amount so the content area keeps its size.
+    padding: Style.space(8)
+    readonly property int savedPadding: Math.max(0, Style.spacing.popupPadding - panel.padding)
     // Never narrower than the status line and the banner need, whatever the
     // density scales the spacing down to.
-    contentWidth: panel.fittedContentWidth(Math.max(root.sp(330), Style.space(220)))
+    contentWidth: panel.fittedContentWidth(Math.max(root.sp(330), Style.space(220)) - 2 * savedPadding)
     contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
@@ -653,7 +673,7 @@ Panel {
           TandemIcon {
             id: headerIcon
             iconWidth: Math.round(root.fontDisplay * 1.5)
-            color: Color.accent
+            color: root.accent
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
           }
@@ -696,16 +716,16 @@ Panel {
                 width: versionText.implicitWidth + root.sp(10)
                 height: versionText.implicitHeight + root.sp(4)
                 radius: height / 2
-                color: Util.alpha(Color.accent, 0.15)
+                color: Util.alpha(root.accent, 0.15)
                 border.width: 1
-                border.color: Util.alpha(Color.accent, 0.45)
+                border.color: Util.alpha(root.accent, 0.45)
 
                 Text {
                   id: versionText
                   anchors.centerIn: parent
                   textFormat: Text.PlainText
                   text: "v" + root.version
-                  color: Color.accent
+                  color: root.accent
                   font.family: Style.font.family
                   font.pixelSize: root.fontCaption
                   font.bold: true
@@ -717,7 +737,7 @@ Panel {
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
                 text: "\uf09b"
-                color: repoMouse.containsMouse ? Color.accent : root.barForeground
+                color: repoMouse.containsMouse ? root.accent : root.barForeground
                 opacity: repoMouse.containsMouse ? 1.0 : 0.6
                 font.family: Style.font.family
                 font.pixelSize: root.fontBody
@@ -813,9 +833,9 @@ Panel {
           visible: root.dirty || root.busy || root.errorText !== ""
           implicitHeight: bannerRow.implicitHeight + root.sp(16)
           radius: root.sp(7)
-          color: Util.alpha(root.errorText !== "" ? (root.bar ? root.bar.urgent : Color.urgent) : Color.accent, 0.12)
+          color: Util.alpha(root.errorText !== "" ? (root.bar ? root.bar.urgent : Color.urgent) : root.accent, 0.12)
           border.width: 1
-          border.color: Util.alpha(root.errorText !== "" ? (root.bar ? root.bar.urgent : Color.urgent) : Color.accent, 0.4)
+          border.color: Util.alpha(root.errorText !== "" ? (root.bar ? root.bar.urgent : Color.urgent) : root.accent, 0.4)
 
           Row {
             id: bannerRow
@@ -863,7 +883,7 @@ Panel {
               width: applyText.implicitWidth + root.sp(18)
               height: applyText.implicitHeight + root.sp(10)
               radius: root.sp(6)
-              color: Color.accent
+              color: root.accent
               opacity: root.busy ? 0.5 : (applyMouse.containsMouse ? 1.0 : 0.9)
 
               Text {
@@ -912,7 +932,7 @@ Panel {
                 width: parent.width * 0.5
                 height: Math.max(2, root.sp(2))
                 radius: height / 2
-                color: Color.accent
+                color: root.accent
               }
 
               Column {
@@ -924,7 +944,7 @@ Panel {
                   anchors.horizontalCenter: parent.horizontalCenter
                   textFormat: Text.PlainText
                   text: tab.modelData.icon
-                  color: tab.current ? Color.accent : root.barForeground
+                  color: tab.current ? root.accent : root.barForeground
                   opacity: tab.current || tabMouse.containsMouse ? 1.0 : 0.55
                   font.family: Style.font.family
                   font.pixelSize: root.fontTitle
@@ -934,7 +954,7 @@ Panel {
                   anchors.horizontalCenter: parent.horizontalCenter
                   textFormat: Text.PlainText
                   text: tab.modelData.label
-                  color: tab.current ? Color.accent : root.barForeground
+                  color: tab.current ? root.accent : root.barForeground
                   opacity: tab.current || tabMouse.containsMouse ? 1.0 : 0.55
                   font.family: Style.font.family
                   font.pixelSize: root.fontCaption
@@ -959,7 +979,7 @@ Panel {
   // Text on an accent fill: black or white by the accent's luminance, so it
   // stays readable whatever the theme's accent is.
   readonly property color onAccent: {
-    var c = Color.accent
+    var c = root.accent
     return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) > 0.5 ? "#101014" : "#ffffff"
   }
 
@@ -1002,7 +1022,7 @@ Panel {
           width: root.sp(22)
           horizontalAlignment: Text.AlignHCenter
           text: root.pDesktops
-          color: Color.accent
+          color: root.accent
           font.family: Style.font.family
           font.pixelSize: root.fontTitle
           font.bold: true
@@ -1033,9 +1053,9 @@ Panel {
           width: parent.width
           implicitHeight: nameField.implicitHeight + infoLine.implicitHeight + root.sp(15)
           radius: root.sp(7)
-          color: current ? Util.alpha(Color.accent, 0.12) : root.tint(0.05)
+          color: current ? Util.alpha(root.accent, 0.12) : root.tint(0.05)
           border.width: 1
-          border.color: current ? Util.alpha(Color.accent, 0.45) : root.tint(0.1)
+          border.color: current ? Util.alpha(root.accent, 0.45) : root.tint(0.1)
 
           Rectangle {
             width: root.sp(26)
@@ -1047,13 +1067,13 @@ Panel {
             radius: root.sp(6)
             color: root.tint(0.08)
             border.width: 1
-            border.color: deskRow.current ? Color.accent : root.tint(0.18)
+            border.color: deskRow.current ? root.accent : root.tint(0.18)
 
             Text {
               anchors.centerIn: parent
               textFormat: Text.PlainText
               text: deskRow.modelData.i + 1
-              color: deskRow.current ? Color.accent : root.barForeground
+              color: deskRow.current ? root.accent : root.barForeground
               font.family: Style.font.family
               font.pixelSize: root.fontSmall
               font.bold: true
@@ -1073,7 +1093,7 @@ Panel {
               anchors.fill: parent
               visible: deskRow.current
               radius: root.sp(5)
-              color: Color.accent
+              color: root.accent
 
               Text {
                 id: activeText
@@ -1092,16 +1112,16 @@ Panel {
               anchors.fill: parent
               visible: !deskRow.current
               radius: root.sp(5)
-              color: switchMouse.containsMouse ? Util.alpha(Color.accent, 0.18) : "transparent"
+              color: switchMouse.containsMouse ? Util.alpha(root.accent, 0.18) : "transparent"
               border.width: 1
-              border.color: switchMouse.containsMouse ? Color.accent : root.tint(0.25)
+              border.color: switchMouse.containsMouse ? root.accent : root.tint(0.25)
 
               Text {
                 id: switchText
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
                 text: "Switch"
-                color: switchMouse.containsMouse ? Color.accent : root.barForeground
+                color: switchMouse.containsMouse ? root.accent : root.barForeground
                 font.family: Style.font.family
                 font.pixelSize: root.fontCaption
               }
@@ -1245,16 +1265,16 @@ Panel {
         width: implicitWidth
         height: implicitHeight
         radius: root.sp(5)
-        color: identifyMouse.containsMouse ? Util.alpha(Color.accent, 0.18) : "transparent"
+        color: identifyMouse.containsMouse ? Util.alpha(root.accent, 0.18) : "transparent"
         border.width: 1
-        border.color: identifyMouse.containsMouse ? Color.accent : root.tint(0.25)
+        border.color: identifyMouse.containsMouse ? root.accent : root.tint(0.25)
 
         Text {
           id: identifyText
           anchors.centerIn: parent
           textFormat: Text.PlainText
           text: "Identify"
-          color: identifyMouse.containsMouse ? Color.accent : root.barForeground
+          color: identifyMouse.containsMouse ? root.accent : root.barForeground
           font.family: Style.font.family
           font.pixelSize: root.fontCaption
         }
@@ -1322,9 +1342,9 @@ Panel {
         width: modelData.width * map.frame.scale - 2
         height: modelData.height * map.frame.scale - 2
         radius: root.sp(4)
-        color: focused ? Util.alpha(Color.accent, 0.14) : root.tint(0.07)
+        color: focused ? Util.alpha(root.accent, 0.14) : root.tint(0.07)
         border.width: focused ? 2 : 1
-        border.color: focused ? Color.accent : root.tint(0.3)
+        border.color: focused ? root.accent : root.tint(0.3)
 
         Column {
           anchors.centerIn: parent
@@ -1334,7 +1354,7 @@ Panel {
             anchors.horizontalCenter: parent.horizontalCenter
             textFormat: Text.PlainText
             text: tile.modelData.name
-            color: tile.focused ? Color.accent : root.barForeground
+            color: tile.focused ? root.accent : root.barForeground
             font.family: Style.font.family
             font.pixelSize: root.fontSmall
             font.bold: true
@@ -1430,9 +1450,9 @@ Panel {
       width: parent.width
       implicitHeight: wizardText.implicitHeight + root.sp(18)
       radius: root.sp(7)
-      color: wizardMouse.containsMouse ? Util.alpha(Color.accent, 0.12) : root.tint(0.05)
+      color: wizardMouse.containsMouse ? Util.alpha(root.accent, 0.12) : root.tint(0.05)
       border.width: 1
-      border.color: wizardMouse.containsMouse ? Util.alpha(Color.accent, 0.45) : root.tint(0.1)
+      border.color: wizardMouse.containsMouse ? Util.alpha(root.accent, 0.45) : root.tint(0.1)
 
       Text {
         id: wizardText
@@ -1441,7 +1461,7 @@ Panel {
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: "  Re-run setup wizard"
-        color: wizardMouse.containsMouse ? Color.accent : root.barForeground
+        color: wizardMouse.containsMouse ? root.accent : root.barForeground
         font.family: Style.font.family
         font.pixelSize: root.fontBody
       }
@@ -1500,6 +1520,10 @@ Panel {
       onPicked: function(value) { root.setDisplay("fontSize", value) }
     }
 
+    SectionLabel { icon: "\uf1fb"; text: "ACCENT" }
+
+    AccentPicker { width: parent.width }
+
     SectionLabel { icon: "\uf0ca"; text: "BAR INDICATOR" }
 
     Segmented {
@@ -1548,9 +1572,9 @@ Panel {
           width: (parent.width - root.sp(6)) / 2
           implicitHeight: modeContent.implicitHeight + root.sp(14)
           radius: root.sp(7)
-          color: chosen ? Util.alpha(Color.accent, 0.12) : (modeMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
+          color: chosen ? Util.alpha(root.accent, 0.12) : (modeMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
           border.width: chosen ? 2 : 1
-          border.color: chosen ? Color.accent : root.tint(0.12)
+          border.color: chosen ? root.accent : root.tint(0.12)
 
           Row {
             id: modeContent
@@ -1574,9 +1598,9 @@ Panel {
                   width: wide ? parent.width / 2 - root.sp(1) : parent.width
                   height: wide ? parent.height : parent.height / 2 - root.sp(1)
                   radius: root.sp(2)
-                  color: modeCard.chosen ? Util.alpha(Color.accent, 0.35) : root.tint(0.12)
+                  color: modeCard.chosen ? Util.alpha(root.accent, 0.35) : root.tint(0.12)
                   border.width: 1
-                  border.color: modeCard.chosen ? Color.accent : root.tint(0.35)
+                  border.color: modeCard.chosen ? root.accent : root.tint(0.35)
                 }
               }
             }
@@ -1588,7 +1612,7 @@ Panel {
               Text {
                 textFormat: Text.PlainText
                 text: modeCard.modelData.label
-                color: modeCard.chosen ? Color.accent : root.barForeground
+                color: modeCard.chosen ? root.accent : root.barForeground
                 font.family: Style.font.family
                 font.pixelSize: root.fontSmall
                 font.bold: true
@@ -1713,9 +1737,9 @@ Panel {
       ? keyLabel.implicitHeight + capsRow.implicitHeight + root.sp(20)
       : capsRow.implicitHeight + root.sp(14)
     radius: root.sp(7)
-    color: open ? Util.alpha(Color.accent, 0.1) : (rowMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
+    color: open ? Util.alpha(root.accent, 0.1) : (rowMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
     border.width: 1
-    border.color: open ? Util.alpha(Color.accent, 0.45) : root.tint(0.1)
+    border.color: open ? Util.alpha(root.accent, 0.45) : root.tint(0.1)
 
     MouseArea {
       id: rowMouse
@@ -1843,16 +1867,16 @@ Panel {
               width: modText.implicitWidth + root.sp(16)
               height: modText.implicitHeight + root.sp(10)
               radius: root.sp(5)
-              color: on ? Util.alpha(Color.accent, 0.15) : (modMouse.containsMouse ? root.tint(0.1) : root.tint(0.05))
+              color: on ? Util.alpha(root.accent, 0.15) : (modMouse.containsMouse ? root.tint(0.1) : root.tint(0.05))
               border.width: on ? 2 : 1
-              border.color: on ? Color.accent : root.tint(0.2)
+              border.color: on ? root.accent : root.tint(0.2)
 
               Text {
                 id: modText
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
                 text: modChip.modelData
-                color: modChip.on ? Color.accent : root.barForeground
+                color: modChip.on ? root.accent : root.barForeground
                 font.family: Style.font.family
                 font.pixelSize: root.fontSmall
                 font.bold: modChip.on
@@ -1892,16 +1916,16 @@ Panel {
             width: Math.max(implicitWidth, root.sp(110))
             height: implicitHeight
             radius: root.sp(5)
-            color: root.capturing ? Util.alpha(Color.accent, 0.15) : (keyMouse.containsMouse ? root.tint(0.1) : root.tint(0.06))
+            color: root.capturing ? Util.alpha(root.accent, 0.15) : (keyMouse.containsMouse ? root.tint(0.1) : root.tint(0.06))
             border.width: root.capturing ? 2 : 1
-            border.color: root.capturing ? Color.accent : root.tint(0.28)
+            border.color: root.capturing ? root.accent : root.tint(0.28)
 
             Text {
               id: keyButtonText
               anchors.centerIn: parent
               textFormat: Text.PlainText
               text: root.capturing ? "Press a key..." : root.keyBase(editor.spec)
-              color: root.capturing ? Color.accent : root.barForeground
+              color: root.capturing ? root.accent : root.barForeground
               font.family: Style.font.family
               font.pixelSize: root.fontSmall
               font.bold: !root.capturing
@@ -1936,16 +1960,16 @@ Panel {
     implicitWidth: root.sp(26)
     implicitHeight: root.sp(26)
     radius: root.sp(7)
-    color: stepMouse.containsMouse && step.active ? Util.alpha(Color.accent, 0.2) : root.tint(0.06)
+    color: stepMouse.containsMouse && step.active ? Util.alpha(root.accent, 0.2) : root.tint(0.06)
     border.width: 1
-    border.color: stepMouse.containsMouse && step.active ? Color.accent : root.tint(0.25)
+    border.color: stepMouse.containsMouse && step.active ? root.accent : root.tint(0.25)
     opacity: step.active ? 1.0 : 0.4
 
     Text {
       anchors.centerIn: parent
       textFormat: Text.PlainText
       text: step.iconText
-      color: stepMouse.containsMouse && step.active ? Color.accent : root.barForeground
+      color: stepMouse.containsMouse && step.active ? root.accent : root.barForeground
       font.family: Style.font.family
       font.pixelSize: root.fontSmall
     }
@@ -1986,16 +2010,16 @@ Panel {
         width: segmented.cellWidth
         implicitHeight: choiceText.implicitHeight + root.sp(12)
         radius: root.sp(7)
-        color: chosen ? Util.alpha(Color.accent, 0.12) : (choiceMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
+        color: chosen ? Util.alpha(root.accent, 0.12) : (choiceMouse.containsMouse ? root.tint(0.09) : root.tint(0.05))
         border.width: chosen ? 2 : 1
-        border.color: chosen ? Color.accent : root.tint(0.12)
+        border.color: chosen ? root.accent : root.tint(0.12)
 
         Text {
           id: choiceText
           anchors.centerIn: parent
           textFormat: Text.PlainText
           text: choice.modelData.label
-          color: choice.chosen ? Color.accent : root.barForeground
+          color: choice.chosen ? root.accent : root.barForeground
           font.family: Style.font.family
           font.pixelSize: root.fontSmall
           font.bold: choice.chosen
@@ -2007,6 +2031,72 @@ Panel {
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
           onClicked: segmented.picked(choice.modelData.value)
+        }
+      }
+    }
+  }
+
+  // The theme's own accent, then the other colours of its palette, each drawn
+  // in its real colour. The chosen one is ringed.
+  component AccentPicker: Flow {
+    id: picker
+    spacing: root.sp(5)
+
+    readonly property var choices: ["theme"].concat(accentSource.available)
+
+    Repeater {
+      model: picker.choices
+
+      Rectangle {
+        id: swatch
+        required property string modelData
+        readonly property bool chosen: root.accentChoice === modelData
+        readonly property bool isTheme: modelData === "theme"
+        width: isTheme ? themeLabel.implicitWidth + root.sp(30) : root.sp(23)
+        height: root.sp(23)
+        radius: height / 2
+        color: isTheme ? root.tint(0.06) : accentSource.colorOf(modelData)
+        border.width: chosen ? 2 : 1
+        border.color: chosen ? root.barForeground : root.tint(isTheme ? 0.25 : 0.15)
+
+        // The theme entry is a pill with a dot in the theme's accent.
+        Rectangle {
+          visible: swatch.isTheme
+          anchors.left: parent.left
+          anchors.leftMargin: root.sp(7)
+          anchors.verticalCenter: parent.verticalCenter
+          width: root.sp(11)
+          height: width
+          radius: width / 2
+          color: Color.accent
+        }
+
+        Text {
+          id: themeLabel
+          visible: swatch.isTheme
+          anchors.right: parent.right
+          anchors.rightMargin: root.sp(8)
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: "Theme"
+          color: root.barForeground
+          font.family: Style.font.family
+          font.pixelSize: root.fontSmall
+          font.bold: swatch.chosen
+        }
+
+        MouseArea {
+          id: swatchMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.setAccent(swatch.modelData)
+        }
+
+        PanelToolTip {
+          visible: swatchMouse.containsMouse
+          text: swatch.isTheme ? "Theme accent" : swatch.modelData.charAt(0).toUpperCase() + swatch.modelData.slice(1)
+          fontFamily: Style.font.family
         }
       }
     }
@@ -2061,9 +2151,9 @@ Panel {
     Rectangle {
       anchors.fill: parent
       radius: height / 2
-      color: sw.checked ? Util.alpha(Color.accent, 0.3) : Util.alpha(root.barForeground, 0.1)
+      color: sw.checked ? Util.alpha(root.accent, 0.3) : Util.alpha(root.barForeground, 0.1)
       border.width: 1
-      border.color: sw.checked ? Color.accent : Util.alpha(root.barForeground, 0.25)
+      border.color: sw.checked ? root.accent : Util.alpha(root.barForeground, 0.25)
       Behavior on color { ColorAnimation { duration: 120 } }
 
       Rectangle {
@@ -2072,7 +2162,7 @@ Panel {
         radius: width / 2
         anchors.verticalCenter: parent.verticalCenter
         x: sw.checked ? parent.width - width - root.sp(3) : root.sp(3)
-        color: sw.checked ? Color.accent : Qt.darker(root.barForeground, 1.4)
+        color: sw.checked ? root.accent : Qt.darker(root.barForeground, 1.4)
         Behavior on x { NumberAnimation { duration: 120 } }
         Behavior on color { ColorAnimation { duration: 120 } }
       }

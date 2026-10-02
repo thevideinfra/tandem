@@ -50,6 +50,8 @@ BarWidget {
   property bool divider: false
   // Small app icons after each desktop's name, for what is open on it.
   property bool windowIcons: false
+  // Which colour to highlight with: "theme" or a palette name.
+  property string accentChoice: "theme"
   // Clicking a desktop in the bar goes to it. On unless switched off.
   property bool clickToSwitch: true
 
@@ -79,6 +81,7 @@ BarWidget {
             root.indicatorStyle = e.indicator === "text" ? "text" : "boxes"
             root.divider = e.divider === true
             root.windowIcons = e.windowIcons === true
+            root.accentChoice = e.accent || "theme"
             root.clickToSwitch = e.clickToSwitch !== false
             return
           }
@@ -132,9 +135,17 @@ BarWidget {
       screen: root.QsWindow.window ? root.QsWindow.window.screen : null
       count: root.deskCount
       labels: root.popupLabels
+      accent: root.accent
       vertical: root.popupVertical
     }
   }
+
+  TandemAccent {
+    id: accentSource
+    choice: root.accentChoice
+  }
+
+  readonly property color accent: accentSource.value
 
   WindowIcons {
     id: windowData
@@ -208,7 +219,7 @@ BarWidget {
   // Text on the accent fill: black or white by the accent's luminance, so it
   // stays readable whatever the theme's accent is.
   readonly property color onAccent: {
-    var c = Color.accent
+    var c = root.accent
     return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) > 0.5 ? "#101014" : "#ffffff"
   }
 
@@ -269,7 +280,7 @@ BarWidget {
           ? Math.max(root.boxHeight, Math.round(root.barSize * 0.8))
           : Math.max(root.boxHeight, boxContent.implicitWidth + Style.space(3))
         radius: Style.space(5)
-        color: current ? Color.accent
+        color: current ? root.accent
           : Util.alpha(root.bar ? root.bar.barForeground : Color.foreground, hover.hovered ? 0.18 : 0.09)
         border.width: current ? 0 : 1
         border.color: Util.alpha(root.bar ? root.bar.barForeground : Color.foreground, 0.12)
@@ -362,7 +373,7 @@ BarWidget {
         // red rather than anything in the palette. accent is set by all 22
         // stock themes, so that is the one that actually tracks the theme.
         active: root.desk === textCell.modelData
-        activeColor: Color.accent
+        activeColor: root.accent
         opacity: root.desk === textCell.modelData ? 1 : 0.55
         horizontalMargin: 6
         verticalPadding: 6
@@ -429,7 +440,7 @@ BarWidget {
     width: root.vertical ? Math.round(root.barSize * 0.5) : thickness
     height: root.vertical ? thickness : Math.round(root.barSize * 0.55)
     radius: thickness / 2
-    color: Util.alpha(Color.accent, 0.8)
+    color: Util.alpha(root.accent, 0.8)
     anchors.right: root.vertical ? undefined : parent.right
     anchors.rightMargin: Style.space(5)
     anchors.verticalCenter: root.vertical ? undefined : parent.verticalCenter
