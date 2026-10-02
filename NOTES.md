@@ -145,6 +145,16 @@ with some application rather than nothing) and pass the entry's icon to
 `Hyprland.toplevels` carries each window's `workspace`, `title` and
 `wayland.appId`.
 
+**The shell exposes only five colour roles; the rest of the palette is in
+`colors.toml`.** `Color` has foreground, background, accent, urgent and muted,
+but the current theme's `~/.local/state/omarchy/current/theme/colors.toml`
+also carries red, orange, yellow, green, cyan, blue, magenta, brown and the
+bright variants (all 22 stock themes define every one but orange, which 19
+do). `TandemAccent.qml` parses it with a watched `FileView` and re-reads
+shortly after `Color.accent` changes, since a theme switch is pushed to the
+shell rather than always touching the watched file. Store the colour by name so
+it follows the theme.
+
 **Bar clicks go to registered targets, not to the widget's own handlers.** The
 bar puts a `MouseArea` over every slot so widgets can be dragged to reorder,
 and on a click it calls `triggerPress(button)` on whichever *registered* click
