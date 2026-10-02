@@ -665,7 +665,7 @@ Panel {
         anchors.top: parent.top
         spacing: root.sp(10)
 
-        // ---------- Header: icon · title/status · close ----------
+        // ---------- Header: icon · title/status ----------
         Item {
           width: parent.width
           implicitHeight: Math.max(headerIcon.implicitHeight, headerLabels.implicitHeight)
@@ -682,8 +682,7 @@ Panel {
             id: headerLabels
             anchors.left: headerIcon.right
             anchors.leftMargin: root.sp(12)
-            anchors.right: closeButton.left
-            anchors.rightMargin: root.sp(8)
+            anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: root.sp(2)
 
@@ -778,38 +777,6 @@ Panel {
             }
           }
 
-          Rectangle {
-            id: closeButton
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: root.sp(26)
-            height: root.sp(26)
-            radius: root.sp(6)
-            color: closeMouse.containsMouse ? root.tint(0.12) : "transparent"
-
-            Text {
-              anchors.centerIn: parent
-              textFormat: Text.PlainText
-              text: ""
-              color: root.barForeground
-              font.family: Style.font.family
-              font.pixelSize: root.fontBody
-            }
-
-            MouseArea {
-              id: closeMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.close()
-            }
-
-            PanelToolTip {
-              visible: closeMouse.containsMouse
-              text: "Close"
-              fontFamily: Style.font.family
-            }
-          }
         }
 
         PanelSeparator { foreground: root.barForeground }
