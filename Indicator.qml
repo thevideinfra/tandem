@@ -56,7 +56,6 @@ BarWidget {
   property bool clickToSwitch: true
 
   FileView {
-    id: liveConfig
     path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
     watchChanges: true
     printErrors: false
@@ -189,7 +188,6 @@ BarWidget {
     Quickshell.env("HOME") + "/.config/omarchy/plugins/videinfra.tandem"
 
   Process {
-    id: probe
     running: true
     command: [root.pluginDir + "/tandem-config", "get"]
     stdout: StdioCollector {
@@ -292,7 +290,6 @@ BarWidget {
           spacing: Style.space(3)
 
           Text {
-            id: boxText
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: root.labelFor(box.modelData)
@@ -364,7 +361,6 @@ BarWidget {
         spacing: 0
 
       WidgetButton {
-        id: textButton
         bar: root.bar
         text: root.labelFor(textCell.modelData)
         // Distinguish the current desktop by hue, not just brightness.

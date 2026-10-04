@@ -1141,7 +1141,6 @@ Panel {
             readonly property int shown: Math.min(windows.length, 8)
 
             Text {
-              id: infoText
               anchors.right: parent.right
               anchors.rightMargin: root.sp(2)
               anchors.verticalCenter: parent.verticalCenter
