@@ -63,6 +63,18 @@ No API reports that the mouse button came up:
   read false against a held button.
 - `HL.Window` has no drag field, and no mouse-button event exists.
 
+## Hyprland 0.57
+
+- `hl.bind` rejects `mouse = true` combined with other options ("mouse is
+  exclusive"), so the release bind is a plain `{ release = true }`.
+- `monitor:set_workspace` takes a plain selector string on 0.57 and the
+  `{ workspace = id }` table on 0.56. The rejection is logged, not thrown, so
+  `pcall` cannot pick the form; `body.lua` reads `hl.version()` instead.
+- After a keyboard carry 0.57 re-sends the held SUPER+mouse press on the new
+  desktop, which re-armed the `drag` record and carried the window back on the
+  next switch. Presses are ignored for 500 ms after a carry; a deliberate
+  re-grab inside that window is not armed.
+
 Consequences for carrying a dragged window:
 
 - **A mouse switch carries it; a keyboard switch does not.** `SUPER+scroll`
