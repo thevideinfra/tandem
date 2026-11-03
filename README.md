@@ -74,7 +74,7 @@ One key answer gives both binds: `F` becomes `SUPER + F` to switch and
 <p>
   <img src="assets/panel-desktops.png" alt="The Desktops page: the desktop count, a named row per desktop with app icons for its open windows and the workspaces it owns, and the monitors drawn to scale" width="250">
   <img src="assets/panel-keybinds.png" alt="The Keybinds page: the switch and send keys as key caps, switches for the extra binds, and the setup wizard" width="250">
-  <img src="assets/panel-styling.png" alt="The Styling page: density, font size, bar indicator, switch mode, transition and the pager popup" width="250">
+  <img src="assets/panel-styling.png" alt="The Styling page: density, font size, accent switches and colours, bar indicator, switch mode, transition and the pager popup" width="250">
 </p>
 
 The **panel** (two-monitor icon, right of the bar) has three pages, switched
