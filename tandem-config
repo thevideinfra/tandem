@@ -21,9 +21,11 @@
 #       windowIcons (bool; app icons for what is open, in the bar),
 #       clickToSwitch (bool; clicking a desktop in the bar goes to it),
 #       accent (theme|blue|cyan|green|magenta|yellow|red|orange: the colour
-#       Tandem highlights with; "theme" is the theme's own accent).
+#       Tandem highlights with; "theme" is the theme's own accent),
+#       panelAccent, indicatorAccent (bool; false draws the panel, or the bar
+#       indicator and popup, in the plain bar foreground).
 #
-# labels, density, fontSize, mode, popup, indicator, divider, windowIcons, clickToSwitch and accent are display settings: the panel and
+# labels, density, fontSize, mode, popup, indicator, divider, windowIcons, clickToSwitch, accent, panelAccent and indicatorAccent are display settings: the panel and
 # the bar widget read them live from shell.json, so changing only those never
 # touches Hyprland.
 set -euo pipefail
@@ -69,6 +71,8 @@ get)
       windowIcons: (if has("windowIcons") and .windowIcons != null then .windowIcons else false end),
       accent:   (if has("accent") and .accent != null then .accent else "theme" end),
       clickToSwitch: (if has("clickToSwitch") and .clickToSwitch != null then .clickToSwitch else true end),
+      panelAccent: (if has("panelAccent") and .panelAccent != null then .panelAccent else true end),
+      indicatorAccent: (if has("indicatorAccent") and .indicatorAccent != null then .indicatorAccent else true end),
       monitors: (if has("monitors") and .monitors != null then .monitors else null end),
       labels:   (if has("labels")   and .labels   != null then .labels   else null end),
       detected: $monitors,
@@ -88,7 +92,7 @@ set | set-json)
       || { echo "tandem-config: desktops must be 1-10" >&2; return 1; }
     json=$value
     ;;
-  numbers | tab | scroll | popup | divider | windowIcons | clickToSwitch)
+  numbers | tab | scroll | popup | divider | windowIcons | clickToSwitch | panelAccent | indicatorAccent)
     [[ $value == true || $value == false ]] \
       || { echo "tandem-config: $key must be true or false" >&2; return 1; }
     json=$value
@@ -196,7 +200,7 @@ set | set-json)
 
   # Display settings are read live by the panel and the bar widget, so there
   # is nothing to regenerate or reload.
-  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider", "windowIcons", "clickToSwitch", "accent"] | length' <<<"$patch") == 0 ]]; then
+  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider", "windowIcons", "clickToSwitch", "accent", "panelAccent", "indicatorAccent"] | length' <<<"$patch") == 0 ]]; then
     echo "tandem-config: appearance updated"
     exit 0
   fi

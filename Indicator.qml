@@ -52,6 +52,8 @@ BarWidget {
   property bool windowIcons: false
   // Which colour to highlight with: "theme" or a palette name.
   property string accentChoice: "theme"
+  // Off draws the current desktop in the bar foreground instead of the accent.
+  property bool indicatorAccent: true
   // Clicking a desktop in the bar goes to it. On unless switched off.
   property bool clickToSwitch: true
 
@@ -81,6 +83,7 @@ BarWidget {
             root.divider = e.divider === true
             root.windowIcons = e.windowIcons === true
             root.accentChoice = e.accent || "theme"
+            root.indicatorAccent = e.indicatorAccent !== false
             root.clickToSwitch = e.clickToSwitch !== false
             return
           }
@@ -144,7 +147,9 @@ BarWidget {
     choice: root.accentChoice
   }
 
-  readonly property color accent: accentSource.value
+  readonly property color accent: root.indicatorAccent
+    ? accentSource.value
+    : (root.bar ? root.bar.barForeground : Color.foreground)
 
   WindowIcons {
     id: windowData

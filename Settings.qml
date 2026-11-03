@@ -222,6 +222,8 @@ Panel {
   property bool windowIcons: false
   property bool clickToSwitch: true
   property string accentChoice: "theme"
+  property bool panelAccent: true
+  property bool indicatorAccent: true
   readonly property real densityScale:
     density === "compact" ? 0.61 : (density === "roomy" ? 0.83 : 0.71)
   // Text shrinks half as fast as spacing so compact stays readable, then the
@@ -254,8 +256,9 @@ Panel {
     choice: root.accentChoice
   }
 
-  // The colour Tandem highlights with: the theme accent, or a chosen palette colour.
-  readonly property color accent: accentSource.value
+  // The colour Tandem highlights with: the theme accent, or a chosen palette
+  // colour, or the bar foreground when accents are off for the panel.
+  readonly property color accent: root.panelAccent ? accentSource.value : root.barForeground
 
   // Style.space scaled by the chosen density.
   function sp(px) {
@@ -493,6 +496,8 @@ Panel {
       windowIcons = data.windowIcons === true
       clickToSwitch = data.clickToSwitch !== false
       accentChoice = data.accent || "theme"
+      panelAccent = data.panelAccent !== false
+      indicatorAccent = data.indicatorAccent !== false
       detected = data.detected || []
       monitorNames = data.monitors || detected.map(function(m) { return m.name })
       savedLabels = normalizeLabels(data.labels, data.desktops)
@@ -1488,7 +1493,25 @@ Panel {
 
     SectionLabel { icon: "\uf1fb"; text: "ACCENT" }
 
-    AccentPicker { width: parent.width }
+    SettingSwitch {
+      width: parent.width
+      label: "Accent in this panel"
+      checked: root.panelAccent
+      onToggled: root.setDisplay("panelAccent", !root.panelAccent)
+    }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Accent in the bar indicator"
+      checked: root.indicatorAccent
+      onToggled: root.setDisplay("indicatorAccent", !root.indicatorAccent)
+    }
+
+    AccentPicker {
+      width: parent.width
+      enabled: root.panelAccent || root.indicatorAccent
+      opacity: enabled ? 1 : 0.4
+    }
 
     SectionLabel { icon: "\uf0ca"; text: "BAR INDICATOR" }
 

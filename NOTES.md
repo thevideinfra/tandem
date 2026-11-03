@@ -228,6 +228,12 @@ of the bar foreground (alpha 0.05-0.3) for tiles, borders and inactive boxes.
 Text on an accent fill is black or white by the accent's luminance, since no
 single theme colour is readable on every accent.
 
+With `panelAccent` or `indicatorAccent` off, `accent` in that component is the
+bar foreground instead. `onAccent` then picks the opposite shade by luminance,
+so a boxes indicator shows the current desktop as an inverted box, and text
+mode shows it in the foreground. Inactive labels keep their 0.55 opacity, which
+is what still sets the current one apart.
+
 Audit a role before trusting it:
 
 ```bash

@@ -108,6 +108,9 @@ everything else is a tint of the panel's own text colour.
     colour from the current theme's palette — blue, cyan, green, magenta,
     yellow, red or orange, each shown in its real colour. Everything Tandem
     highlights follows it. It is stored by name, so it follows a theme change.
+    Two switches turn the accent off, one for this panel and one for the bar
+    indicator and pager popup. Off, they use the plain bar foreground, like
+    Omarchy's own workspace indicator.
   - **Bar indicator**: **Boxes** (each desktop in a rounded box, the current one
     filled with the accent) or **Text**; a switch for a thin accent-coloured
     line after the last desktop, setting it apart from the icons beside it; and
@@ -201,6 +204,8 @@ bar hands a widget every key on its entry except `id`:
   "windowIcons": false,
   "clickToSwitch": true,
   "accent": "theme",
+  "panelAccent": true,
+  "indicatorAccent": true,
   "popup": false }
 ```
 
@@ -230,6 +235,10 @@ bar hands a widget every key on its entry except `id`:
   `blue`, `cyan`, `green`, `magenta`, `yellow`, `red`, `orange`, taken from the
   current theme's palette. Falls back to the theme accent where the theme has
   no such colour.
+- `panelAccent` — use the accent in the settings panel. On by default; off draws
+  the panel in the plain bar foreground.
+- `indicatorAccent` — use the accent in the bar indicator and the pager popup.
+  On by default; off marks the current desktop with the plain bar foreground.
 - `indicator` — how the bar shows the desktops: `boxes` (the default) or
   `text`.
 - `divider` — draw a thin line after the last desktop in the bar. Off by
@@ -238,7 +247,7 @@ bar hands a widget every key on its entry except `id`:
   bar. Off by default.
 - `clickToSwitch` — clicking a desktop in the bar goes to it. On by default.
 
-`labels`, `mode`, `density`, `fontSize`, `popup`, `indicator`, `divider`, `windowIcons`, `clickToSwitch` and `accent` are display settings that
+`labels`, `mode`, `density`, `fontSize`, `popup`, `indicator`, `divider`, `windowIcons`, `clickToSwitch`, `accent`, `panelAccent` and `indicatorAccent` are display settings that
 the panel and the bar widget read live from `shell.json`, so changing only
 those skips the Hyprland regenerate-and-reload and needs no shell restart.
 
