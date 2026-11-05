@@ -3,19 +3,21 @@ import QtQuick.Shapes
 import qs.Commons
 
 // Two monitors joined by a link: the bar icon for the settings panel. Drawn
-// on a 22 x 10.5 grid with 1.5-unit strokes so it stays crisp at bar size; a
+// on an 18 x 14.5 grid with 1.5-unit strokes so it stays crisp at bar size; a
 // glyph traced from the full-size artwork came out with sub-pixel lines.
+// Omarchy 4.5 scales every bar icon so its longest side is the same, so the
+// drawing is close to square rather than two screens side by side.
 // Each screen's inner edge breaks around the link instead of running under it.
 Item {
   id: root
 
-  property real iconWidth: Style.space(22)
+  property real iconWidth: Style.space(18)
   property color color: Color.foreground
 
-  readonly property real u: iconWidth / 22
+  readonly property real u: iconWidth / 18
 
   width: iconWidth
-  height: 10.5 * u
+  height: 14.5 * u
   implicitWidth: width
   implicitHeight: height
 
@@ -25,17 +27,17 @@ Item {
     layer.enabled: true
     layer.samples: 4
 
-    Outline { edge: 9.25; outer: 0.75 }
-    Outline { edge: 12.75; outer: 21.25 }
+    Outline { edge: 7.25; outer: 0.75 }
+    Outline { edge: 10.75; outer: 17.25 }
 
     // The link, overlapping both screens.
-    Bar { x0: 6.5; y0: 3.0; x1: 15.5; y1: 4.5 }
+    Bar { x0: 5.5; y0: 4.5; x1: 12.5; y1: 6.0 }
 
     // Stands: a neck and a base under each screen.
-    Bar { x0: 4.25; y0: 6.75; x1: 5.75; y1: 9.25 }
-    Bar { x0: 2.5; y0: 9.0; x1: 7.5; y1: 10.5 }
-    Bar { x0: 16.25; y0: 6.75; x1: 17.75; y1: 9.25 }
-    Bar { x0: 14.5; y0: 9.0; x1: 19.5; y1: 10.5 }
+    Bar { x0: 3.25; y0: 10.75; x1: 4.75; y1: 13.25 }
+    Bar { x0: 1.5; y0: 13.0; x1: 6.5; y1: 14.5 }
+    Bar { x0: 13.25; y0: 10.75; x1: 14.75; y1: 13.25 }
+    Bar { x0: 11.5; y0: 13.0; x1: 16.5; y1: 14.5 }
   }
 
   // A screen outline as one open stroke, starting and ending on the inner
@@ -47,7 +49,7 @@ Item {
     readonly property real dir: outer < edge ? -1 : 1
     readonly property real r: 1.5
     readonly property real top: 0.75
-    readonly property real bottom: 6.75
+    readonly property real bottom: 10.75
 
     strokeColor: root.color
     strokeWidth: 1.5 * root.u
