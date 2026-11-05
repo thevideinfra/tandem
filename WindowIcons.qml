@@ -4,20 +4,44 @@ import Quickshell.Hyprland
 
 // What is open on each desktop, as data and icons. The settings panel and the
 // bar indicator both ask this, so the lookup lives in one place. A desktop owns
-// one workspace per monitor, so its workspaces are numbered from `monitorCount`.
+// one workspace per monitor. Their numbers come from `bases` when Omarchy gives
+// each monitor a block of ten (4.5 and later): desktop N is `bases[monitor] + N`.
+// With no bases they interleave, numbered from `monitorCount`.
 Item {
   id: root
 
   property int monitorCount: 1
+  property var bases: []
+  // False until the numbering has been read, so a desktop is not guessed from
+  // the interleaved formula while the real one is still on its way.
+  property bool ready: false
+  readonly property int slots: 10
   // The shell's AppLibrary (bar.shell.appLibrary), which also searches the
   // on-disk icon index; optional.
   property var appLibrary: null
 
   function workspacesOf(desk) {
     var out = []
+    if (root.bases && root.bases.length > 0) {
+      for (var b = 0; b < root.bases.length; b++) out.push(root.bases[b] + desk)
+      return out
+    }
     var count = Math.max(1, root.monitorCount)
     for (var i = 1; i <= count; i++) out.push((desk - 1) * count + i)
     return out
+  }
+
+  // The desktop a workspace id belongs to, or 0 for one outside tandem's.
+  function deskOf(id) {
+    if (!(id >= 1)) return 0
+    if (root.bases && root.bases.length > 0) {
+      for (var i = 0; i < root.bases.length; i++) {
+        var slot = id - root.bases[i]
+        if (slot >= 1 && slot <= root.slots) return slot
+      }
+      return 0
+    }
+    return Math.ceil(id / Math.max(1, root.monitorCount))
   }
 
   // The windows open on a desktop, across its workspaces: { appId, title }.

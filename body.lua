@@ -1,14 +1,50 @@
 local COUNT = #MONITORS
 
+-- Omarchy 4.5 gave every monitor a block of ten workspaces of its own (the
+-- first monitor 1-10, the next 11-20) and moves any workspace that sits in the
+-- wrong block on every config reload. Desktop N is then slot N of each
+-- monitor's own block. Without that module the desktops interleave instead:
+-- desktop N is workspaces (N-1)*monitors+1 .. N*monitors, one per monitor.
+local SLOTS = 10
+local by_block = o and o.workspaces and o.workspaces.workspace_id
+local bases = {}   -- monitor name -> workspace id just below its block
+
+local function base_of(name)
+  local base = bases[name]
+  if not base then
+    base = o.workspaces.workspace_id({ name = name }, 1) - 1
+    bases[name] = base
+  end
+  return base
+end
+
+-- Omarchy keeps a monitor's block across plugs, but ask again after a change.
+local function forget() bases = {} end
+hl.on("monitor.added", forget)
+hl.on("monitor.removed", forget)
+hl.on("config.reloaded", forget)
+
 local function workspace(desk, index)
+  if by_block then return base_of(MONITORS[index]) + desk end
   return (desk - 1) * COUNT + index
 end
 
 -- The desktop a workspace id belongs to, or nil for special workspaces and
--- anything outside the tandem range.
-local function desk_of(id)
-  if not id or id < 1 or id > DESKTOPS * COUNT then return nil end
-  return math.floor((id - 1) / COUNT) + 1
+-- anything outside the tandem range. With `index`, only that monitor's own
+-- workspaces count, so a monitor sitting in another's block is not on a desktop.
+local function desk_of(id, index)
+  if not id or id < 1 then return nil end
+  if not by_block then
+    if id > DESKTOPS * COUNT then return nil end
+    return math.floor((id - 1) / COUNT) + 1
+  end
+  for at, name in ipairs(MONITORS) do
+    if not index or index == at then
+      local slot = id - base_of(name)
+      if slot >= 1 and slot <= math.min(DESKTOPS, SLOTS) then return slot end
+    end
+  end
+  return nil
 end
 
 local function current_desk()
@@ -19,10 +55,10 @@ end
 -- The desktop every monitor is on, or nil while they are split.
 local function shared_desk()
   local shared = nil
-  for _, name in ipairs(MONITORS) do
+  for index, name in ipairs(MONITORS) do
     local monitor = hl.get_monitor(name)
     local ws = monitor and monitor.active_workspace
-    local desk = desk_of(ws and ws.id)
+    local desk = desk_of(ws and ws.id, index)
     if not desk or (shared and desk ~= shared) then return nil end
     shared = desk
   end

@@ -53,7 +53,21 @@ get)
     | jq -c 'sort_by(.y, .x) | [.[] | {name, width, height, x, y}]' 2>/dev/null || echo '[]')
   # Fill defaults so the panel never has to know them.
   version=$(jq -r '.version // ""' "$HERE/manifest.json" 2>/dev/null || true)
-  settings | jq -c --argjson monitors "$monitors" --argjson configured "$configured" --arg version "$version" '
+  # Workspace numbering. Omarchy 4.5 gives each monitor a block of ten, kept in
+  # a state file keyed by connector; older versions interleave the desktops.
+  # `bases` is each monitor's block start, in the order tandem uses.
+  omarchy_dir="${OMARCHY_PATH:-/usr/share/omarchy}"
+  ws_mode=interleaved
+  blocks='{}'
+  if [[ -f $omarchy_dir/default/hypr/monitor-workspaces.lua ]]; then
+    ws_mode=blocks
+    ws_state="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/monitor-workspaces"
+    if [[ -f $ws_state ]]; then
+      blocks=$(jq -Rn '[inputs | split("\t") | select(length >= 2) | {key: .[1], value: (.[0] | tonumber)}] | from_entries' "$ws_state" 2>/dev/null || echo '{}')
+    fi
+  fi
+  settings | jq -c --argjson monitors "$monitors" --argjson configured "$configured" --arg version "$version" \
+    --arg wsmode "$ws_mode" --argjson blocks "$blocks" '
     {
       desktops: (if has("desktops") and .desktops != null then .desktops else 2 end),
       toggle:   (if has("toggle")   and .toggle   != null then .toggle   else "SUPER + F" end),
@@ -78,7 +92,13 @@ get)
       detected: $monitors,
       configured: $configured,
       version: $version
-    }'
+    }
+    | . + { workspaces: {
+        mode: $wsmode,
+        bases: (if $wsmode == "blocks"
+          then [(.monitors // ($monitors | map(.name))) | to_entries[] | (($blocks[.value] // .key) * 10)]
+          else [] end)
+      } }'
   ;;
 
 set | set-json)

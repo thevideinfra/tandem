@@ -20,7 +20,7 @@ https://github.com/user-attachments/assets/117b8858-4796-4549-ae8f-0be6ca892d04
 
 ## Model
 
-A desktop owns one workspace per monitor:
+A desktop owns one workspace per monitor. Before Omarchy 4.5 they interleave:
 
 ```
 workspace = (desktop - 1) * #MONITORS + monitor_index
@@ -32,6 +32,16 @@ Two monitors, two desktops:
 |---------|-----------|-----------|
 | D1      | ws 1      | ws 2      |
 | D2      | ws 3      | ws 4      |
+
+On Omarchy 4.5 and later every monitor already owns a block of ten workspaces
+(the first monitor 1-10, the next 11-20), and Omarchy moves a workspace back
+into its monitor's block on every reload. Tandem follows that instead: desktop
+N is slot N of each monitor's block.
+
+| Desktop | Monitor 1 | Monitor 2 |
+|---------|-----------|-----------|
+| D1      | ws 1      | ws 11     |
+| D2      | ws 2      | ws 12     |
 
 A persistent workspace rule pins each workspace to its monitor, so nothing
 drifts between screens.

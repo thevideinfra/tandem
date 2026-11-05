@@ -25,15 +25,15 @@ BarWidget {
     var highest = 0
     var values = Hyprland.workspaces.values
     for (var i = 0; i < values.length; i++) {
-      if (values[i].id > highest) highest = values[i].id
+      highest = Math.max(highest, windowData.deskOf(values[i].id))
     }
-    if (highest > 0) return Math.max(1, Math.ceil(highest / monitorCount))
+    if (highest > 0) return highest
     return (settings && settings.desktops > 0) ? settings.desktops : 1
   }
 
   readonly property int desk: Hyprland.focusedWorkspace === null
     ? 1
-    : Math.max(1, Math.ceil(Hyprland.focusedWorkspace.id / monitorCount))
+    : Math.max(1, windowData.deskOf(Hyprland.focusedWorkspace.id))
 
   // The popup's on/off switch and the animation style are read from
   // shell.json directly. Injected `settings` only refreshes when the bar
@@ -109,7 +109,7 @@ BarWidget {
     interval: 80
     onTriggered: {
       // Hyprland is not up yet right after a shell restart.
-      if (Hyprland.focusedWorkspace === null) { restart(); return }
+      if (Hyprland.focusedWorkspace === null || !windowData.ready) { restart(); return }
       var previous = root.lastDesk
       root.lastDesk = root.desk
       if (previous < 1 || previous === root.desk) return
@@ -198,8 +198,12 @@ BarWidget {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        try { root.configured = JSON.parse(text).configured === true }
-        catch (e) { root.configured = true }
+        try {
+          var data = JSON.parse(text)
+          root.configured = data.configured === true
+          windowData.bases = (data.workspaces && data.workspaces.bases) || []
+        } catch (e) { root.configured = true }
+        windowData.ready = true
       }
     }
   }

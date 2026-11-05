@@ -63,6 +63,28 @@ No API reports that the mouse button came up:
   read false against a held button.
 - `HL.Window` has no drag field, and no mouse-button event exists.
 
+## Omarchy 4.5 workspace blocks
+
+`default/hypr/monitor-workspaces.lua` gives every monitor a block of ten
+workspaces (block 0 is 1-10, block 1 is 11-20), keyed by the physical monitor
+in `~/.local/state/omarchy/monitor-workspaces`. On `hyprland.start`,
+`config.reloaded` and `monitor.added/removed` it renumbers any workspace with
+windows that sits on a monitor other than its block's owner, and puts a
+monitor showing a workspace outside its own block back on one of its own.
+
+Tandem's old interleaved numbering (DP-1 odd, DP-3 even) put both monitors'
+workspaces in block 0, so the first reload renumbered DP-3's to 12 and split
+the desktops. Now, when `o.workspaces.workspace_id` exists, desktop N on a
+monitor is `workspace_id(monitor, N)`, and `desk_of` only counts a monitor's
+own block. The QML side gets the block starts from `tandem-config get`
+(`workspaces.bases`, in tandem's monitor order, read from the state file) and
+shares one `deskOf` in `WindowIcons.qml`. `tandem-apply` retires windows above
+the new desktop count per block. Older Omarchy keeps the interleaved formula.
+
+The bar indicator reads `bases` once at start; a monitor-order change needs a
+shell restart. `test/numbering.lua` loads `body.lua` against a mocked `hl`/`o`
+and checks both numbering schemes (`lua5.4 test/numbering.lua`).
+
 ## Hyprland 0.57
 
 - `hl.bind` rejects `mouse = true` combined with other options ("mouse is
@@ -267,6 +289,7 @@ done
 
 ```bash
 bash -n tandem-{apply,setup,config} install.sh uninstall.sh
+lua5.4 test/numbering.lua
 omarchy plugin validate .
 qmllint BarWidget.qml Indicator.qml Settings.qml   # qs.* import warnings are noise
 HOME=/tmp/sandbox ./install.sh && HOME=/tmp/sandbox ./uninstall.sh

@@ -289,7 +289,7 @@ Panel {
   readonly property int monitorCount: Math.max(1, Hyprland.monitors.values.length)
   readonly property int currentDesk: Hyprland.focusedWorkspace === null
     ? 1
-    : Math.max(1, Math.ceil(Hyprland.focusedWorkspace.id / monitorCount))
+    : Math.max(1, windowData.deskOf(Hyprland.focusedWorkspace.id))
 
   // Where a detected monitor sits relative to the others: "Top" / "Bottom"
   // when stacked, "Left" / "Right" side by side, "Top left" and so on for a
@@ -328,12 +328,7 @@ Panel {
   }
 
   // Workspace numbers a desktop owns, one per monitor: "1 \u00b7 2".
-  function workspacesOf(desk) {
-    var out = []
-    var count = Math.max(1, monitorNames.length || monitorCount)
-    for (var i = 1; i <= count; i++) out.push((desk - 1) * count + i)
-    return out
-  }
+  function workspacesOf(desk) { return windowData.workspacesOf(desk) }
 
   WindowIcons {
     id: windowData
@@ -499,6 +494,8 @@ Panel {
       panelAccent = data.panelAccent !== false
       indicatorAccent = data.indicatorAccent !== false
       detected = data.detected || []
+      windowData.bases = (data.workspaces && data.workspaces.bases) || []
+      windowData.ready = true
       monitorNames = data.monitors || detected.map(function(m) { return m.name })
       savedLabels = normalizeLabels(data.labels, data.desktops)
       revert()
