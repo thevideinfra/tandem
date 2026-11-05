@@ -63,6 +63,24 @@ No API reports that the mouse button came up:
   read false against a held button.
 - `HL.Window` has no drag field, and no mouse-button event exists.
 
+## Panel size
+
+The panel scales with two numbers in `Settings.qml`. `densityScale` shrinks
+spacing, and `fontScale` is `(0.5 + 0.5 * densityScale)` times a text factor,
+so text shrinks half as fast as spacing and stays readable when tight. The
+default is the slider: `densityScale = 0.61 * scale / 100` with the small text
+factor 0.85, which is what Compact and Small gave before. A single slider is
+enough because the text follows the spacing and looks right over the whole
+60-140 range; a separate font slider did not. `presets` brings back the older
+three-way `density` and `fontSize` choices (0.61 / 0.71 / 0.83 and
+0.85 / 0.95 / 1.07) for anyone who wants them.
+
+A number saved under `density` by an interim slider build reads as `scale`, and
+any other value that is not a preset name reads as the default. `tandem-config`
+validates the range, and `test/config.sh` checks it against a scratch
+`shell.json`. The shell's own `NumberField` always draws a box and spin arrows,
+so the density number is a plain `TextInput`; right-click on the slider resets.
+
 ## Omarchy 4.5 workspace blocks
 
 `default/hypr/monitor-workspaces.lua` gives every monitor a block of ten
@@ -290,6 +308,7 @@ done
 ```bash
 bash -n tandem-{apply,setup,config} install.sh uninstall.sh
 lua5.4 test/numbering.lua
+bash test/config.sh
 omarchy plugin validate .
 qmllint BarWidget.qml Indicator.qml Settings.qml   # qs.* import warnings are noise
 HOME=/tmp/sandbox ./install.sh && HOME=/tmp/sandbox ./uninstall.sh

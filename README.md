@@ -84,7 +84,7 @@ One key answer gives both binds: `F` becomes `SUPER + F` to switch and
 <p>
   <img src="assets/panel-desktops.png" alt="The Desktops page: the desktop count, a named row per desktop with app icons for its open windows and the workspaces it owns, and the monitors drawn to scale" width="250">
   <img src="assets/panel-keybinds.png" alt="The Keybinds page: the switch and send keys as key caps, switches for the extra binds, and the setup wizard" width="250">
-  <img src="assets/panel-styling.png" alt="The Styling page: density, font size, accent switches and colours, bar indicator, switch mode, transition and the pager popup" width="250">
+  <img src="assets/panel-styling.png" alt="The Styling page: the density slider, accent switches and colours, bar indicator, switch mode, transition and the pager popup" width="250">
 </p>
 
 The **panel** (two-monitor icon, right of the bar) has three pages, switched
@@ -112,8 +112,11 @@ everything else is a tint of the panel's own text colour.
     default.
   - A button that re-runs the setup wizard for the rest.
 - **Styling** —
-  - **Density** (**Compact**, **Normal** or **Roomy**) and **font size**
-    (**Small**, **Normal** or **Large**).
+  - **Density**: one slider from 60 to 140% of the default, with the number
+    beside it to type over; the text follows the spacing. Right-click the
+    slider to go back to 100. **Classic size presets** switches to the older
+    **Compact / Normal / Roomy** density and **Small / Normal / Large** font
+    size buttons instead.
   - **Accent**: **Theme** (the default, the theme's own accent) or another
     colour from the current theme's palette — blue, cyan, green, magenta,
     yellow, red or orange, each shown in its real colour. Everything Tandem
@@ -139,7 +142,7 @@ Desktop, name, key, switch-mode and transition edits are **staged**. A banner
 appears above the tabs with how many are pending, and **Apply & reload** writes
 them: each write regenerates and reloads the Hyprland config, too disruptive
 to do per click. **Revert** discards them; so does closing the panel. Density,
-font size, the bar indicator, the click switch and the popup only change how
+the bar indicator, the click switch and the popup only change how
 things look or behave in the bar, so they save as you click.
 
 ## Updating
@@ -207,6 +210,8 @@ bar hands a widget every key on its entry except `id`:
   "scroll":   true,
   "animation": "slide",
   "mode":     "horizontal",
+  "scale":    100,
+  "presets":  false,
   "density":  "normal",
   "fontSize": "normal",
   "indicator": "boxes",
@@ -237,9 +242,14 @@ bar hands a widget every key on its entry except `id`:
 - `toggle` / `send` — the switch key and the carry-a-window key. The wizard
   asks for one key and derives both (`F` gives `SUPER + F` and
   `SUPER + SHIFT + F`); set them here to use unrelated keys.
-- `density` / `fontSize` — the panel's own layout: `compact`, `normal` or
-  `roomy` (`comfortable` is still read as `roomy`), and `small`, `normal` or
-  `large`. They change nothing in Hyprland or the bar.
+- `scale` — the panel's size, a whole number from 60 to 140 (percent of the
+  default spacing; the text follows it). 100 by default. It changes nothing in
+  Hyprland or the bar.
+- `presets` — use the classic `density` and `fontSize` choices instead of
+  `scale`. Off by default.
+- `density` / `fontSize` — the classic panel layout, used when `presets` is on:
+  `compact`, `normal` or `roomy` (`comfortable` is still read as `roomy`), and
+  `small`, `normal` or `large`.
 - `popup` — show the pager popup after a desktop switch. Off by default.
 - `accent` — the colour Tandem highlights with: `theme` (the default) or one of
   `blue`, `cyan`, `green`, `magenta`, `yellow`, `red`, `orange`, taken from the
@@ -257,7 +267,7 @@ bar hands a widget every key on its entry except `id`:
   bar. Off by default.
 - `clickToSwitch` — clicking a desktop in the bar goes to it. On by default.
 
-`labels`, `mode`, `density`, `fontSize`, `popup`, `indicator`, `divider`, `windowIcons`, `clickToSwitch`, `accent`, `panelAccent` and `indicatorAccent` are display settings that
+`labels`, `mode`, `scale`, `presets`, `density`, `fontSize`, `popup`, `indicator`, `divider`, `windowIcons`, `clickToSwitch`, `accent`, `panelAccent` and `indicatorAccent` are display settings that
 the panel and the bar widget read live from `shell.json`, so changing only
 those skips the Hyprland regenerate-and-reload and needs no shell restart.
 
