@@ -214,6 +214,11 @@ Panel {
 
   // ---- Display settings ----
   // Same scales as omaudiopanel, so the two panels match side by side.
+  // Two ways to size the panel. The slider (the default) is a percentage of the
+  // default spacing and the text follows it; `presets` brings back the classic
+  // density and font size choices, which are kept as they were.
+  property int scale: 100
+  property bool presets: false
   property string density: "normal"
   property string fontSize: "normal"
   property bool popup: false
@@ -224,12 +229,13 @@ Panel {
   property string accentChoice: "theme"
   property bool panelAccent: true
   property bool indicatorAccent: true
-  readonly property real densityScale:
-    density === "compact" ? 0.61 : (density === "roomy" ? 0.83 : 0.71)
-  // Text shrinks half as fast as spacing so compact stays readable, then the
-  // font size setting scales it on top.
+  readonly property real densityScale: root.presets
+    ? (density === "compact" ? 0.61 : (density === "roomy" ? 0.83 : 0.71))
+    : 0.61 * scale / 100
+  // Text shrinks half as fast as spacing so a tight layout stays readable. The
+  // slider keeps the small text size throughout; the presets scale it on top.
   readonly property real fontScale: (0.5 + 0.5 * densityScale)
-    * (fontSize === "small" ? 0.85 : (fontSize === "large" ? 1.07 : 0.95))
+    * (root.presets ? (fontSize === "small" ? 0.85 : (fontSize === "large" ? 1.07 : 0.95)) : 0.85)
   // Sized off the title token: themes can set body larger than title, which
   // made field and switch text outgrow the panel's own heading.
   readonly property real fontTitle: Math.round(Style.font.title * fontScale * 1.1)
@@ -485,6 +491,8 @@ Panel {
       animation = data.animation || "slide"
       density = data.density || "normal"
       fontSize = data.fontSize || "normal"
+      scale = Number(data.scale) || 100
+      presets = data.presets === true
       popup = data.popup === true
       indicator = data.indicator === "text" ? "text" : "boxes"
       divider = data.divider === true
@@ -1462,7 +1470,15 @@ Panel {
 
     SectionLabel { icon: ""; text: "DENSITY" }
 
+    ScaleRow {
+      visible: !root.presets
+      width: parent.width
+      value: root.scale
+      onChosen: function(v) { root.setDisplay("scale", v) }
+    }
+
     Segmented {
+      visible: root.presets
       width: parent.width
       columns: 3
       choices: [
@@ -1474,9 +1490,14 @@ Panel {
       onPicked: function(value) { root.setDisplay("density", value) }
     }
 
-    SectionLabel { icon: ""; text: "FONT SIZE" }
+    SectionLabel {
+      visible: root.presets
+      icon: ""
+      text: "FONT SIZE"
+    }
 
     Segmented {
+      visible: root.presets
       width: parent.width
       columns: 3
       choices: [
@@ -1486,6 +1507,13 @@ Panel {
       ]
       selected: root.fontSize
       onPicked: function(value) { root.setDisplay("fontSize", value) }
+    }
+
+    SettingSwitch {
+      width: parent.width
+      label: "Classic size presets"
+      checked: root.presets
+      onToggled: root.setDisplay("presets", !root.presets)
     }
 
     SectionLabel { icon: "\uf1fb"; text: "ACCENT" }
@@ -1977,6 +2005,96 @@ Panel {
 
   // Boxed choices in an even grid; the chosen one is outlined and tinted in
   // the accent. choices: [{ value, label }].
+  // The panel size slider: a percentage of the default, with the number beside
+  // it as plain text that can be typed over. It applies when the slider is let
+  // go, not while it moves, so the panel does not resize under the pointer.
+  // Right-click the slider to go back to 100.
+  component ScaleRow: Item {
+    id: scaleRow
+    property int value: 100
+    readonly property int minimum: 60
+    readonly property int maximum: 140
+    signal chosen(int value)
+
+    implicitHeight: Math.max(scaleInput.implicitHeight, scaleSlider.implicitHeight)
+
+    TextMetrics {
+      id: digits
+      font.family: Style.font.family
+      font.pixelSize: root.fontSmall
+      font.bold: true
+      text: "140"
+    }
+
+    PanelSlider {
+      id: scaleSlider
+      anchors.left: parent.left
+      anchors.right: scaleInput.left
+      anchors.rightMargin: root.sp(8)
+      anchors.verticalCenter: parent.verticalCenter
+      bar: root.bar
+      fillColor: root.accent
+      knobColor: root.accent
+      minimum: scaleRow.minimum
+      maximum: scaleRow.maximum
+      step: 1
+      integer: true
+      value: scaleRow.value
+      onReleased: function(v) { scaleRow.chosen(Math.round(v)) }
+      onRightClicked: scaleRow.chosen(100)
+    }
+
+    TextInput {
+      id: scaleInput
+      anchors.right: scaleUnit.left
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.ceil(digits.advanceWidth) + root.sp(2)
+      horizontalAlignment: Text.AlignRight
+      color: root.barForeground
+      selectionColor: root.accent
+      selectedTextColor: root.onAccent
+      font.family: Style.font.family
+      font.pixelSize: root.fontSmall
+      font.bold: true
+      maximumLength: 3
+      selectByMouse: true
+      inputMethodHints: Qt.ImhDigitsOnly
+      validator: IntValidator { bottom: 0; top: 999 }
+
+      readonly property int shown: scaleSlider.dragging ? Math.round(scaleSlider.liveValue) : scaleRow.value
+
+      // Typing overwrites the text, so it is set rather than bound.
+      onShownChanged: if (!activeFocus) text = String(shown)
+      Component.onCompleted: text = String(shown)
+      onActiveFocusChanged: {
+        root.editing = activeFocus
+        if (!activeFocus) text = String(shown)
+      }
+      onEditingFinished: {
+        var n = parseInt(text, 10)
+        if (isFinite(n)) {
+          n = Math.max(scaleRow.minimum, Math.min(scaleRow.maximum, n))
+          if (n !== scaleRow.value) scaleRow.chosen(n)
+        }
+        text = String(scaleRow.value)
+      }
+      Keys.onEscapePressed: keyCatcher.forceActiveFocus()
+    }
+
+    Text {
+      id: scaleUnit
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      text: "%"
+      color: root.barForeground
+      opacity: 0.6
+      font.family: Style.font.family
+      font.pixelSize: root.fontSmall
+      font.bold: true
+    }
+  }
+
   component Segmented: Grid {
     id: segmented
     property var choices: []

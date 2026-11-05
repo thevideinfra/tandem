@@ -14,6 +14,8 @@
 #       labels (JSON array of names, or null for the D1..Dn default),
 #       animation (the Hyprland workspace style), mode (horizontal|vertical: the
 #       way the monitors are arranged, which the popup follows),
+#       scale (60-140: the panel size slider, % of the default; the text follows),
+#       presets (bool; use the classic density and fontSize choices instead),
 #       density (compact|normal|roomy), fontSize (small|normal|large),
 #       popup (bool; the on-screen pager shown after a switch),
 #       indicator (boxes|text; how the bar shows the desktops),
@@ -25,7 +27,7 @@
 #       panelAccent, indicatorAccent (bool; false draws the panel, or the bar
 #       indicator and popup, in the plain bar foreground).
 #
-# labels, density, fontSize, mode, popup, indicator, divider, windowIcons, clickToSwitch, accent, panelAccent and indicatorAccent are display settings: the panel and
+# labels, scale, presets, density, fontSize, mode, popup, indicator, divider, windowIcons, clickToSwitch, accent, panelAccent and indicatorAccent are display settings: the panel and
 # the bar widget read them live from shell.json, so changing only those never
 # touches Hyprland.
 set -euo pipefail
@@ -76,9 +78,12 @@ get)
       tab:      (if has("tab")      and .tab      != null then .tab      else true end),
       scroll:   (if has("scroll")   and .scroll   != null then .scroll   else true end),
       animation:(if has("animation") and .animation!= null then .animation else "slide" end),
-      density:  (if has("density") and .density != null then (if .density == "comfortable" then "roomy" else .density end) else "normal" end),
+      density:  ((if .density == "comfortable" then "roomy" else .density end) as $d | if $d == "compact" or $d == "normal" or $d == "roomy" then $d else "normal" end),
       mode:     (if has("mode") and .mode != null then .mode else null end),
-      fontSize: (if has("fontSize") and .fontSize != null then .fontSize else "normal" end),
+      fontSize: (if .fontSize == "small" or .fontSize == "normal" or .fontSize == "large" then .fontSize else "normal" end),
+      scale:    ((if (.scale | type) == "number" then .scale elif (.density | type) == "number" then .density else 100 end) as $n
+                 | if ($n | type) == "number" and $n >= 60 and $n <= 140 and $n == ($n | floor) then $n else 100 end),
+      presets:  (if has("presets") and .presets != null then .presets else false end),
       popup:    (if has("popup") and .popup != null then .popup else false end),
       indicator: (if has("indicator") and .indicator != null then .indicator else "boxes" end),
       divider:  (if has("divider") and .divider != null then .divider else false end),
@@ -112,7 +117,7 @@ set | set-json)
       || { echo "tandem-config: desktops must be 1-10" >&2; return 1; }
     json=$value
     ;;
-  numbers | tab | scroll | popup | divider | windowIcons | clickToSwitch | panelAccent | indicatorAccent)
+  numbers | tab | scroll | popup | divider | windowIcons | clickToSwitch | panelAccent | indicatorAccent | presets)
     [[ $value == true || $value == false ]] \
       || { echo "tandem-config: $key must be true or false" >&2; return 1; }
     json=$value
@@ -134,6 +139,13 @@ set | set-json)
       ;;
     esac
     json=$(jq -nc --arg v "$value" '$v')
+    ;;
+  scale)
+    # The panel size slider: a percentage of the default spacing, with the text
+    # following it. Anything else reads back as 100.
+    [[ $value =~ ^[0-9]+$ ]] && (( 10#$value >= 60 && 10#$value <= 140 )) \
+      || { echo "tandem-config: scale must be a whole number from 60 to 140" >&2; return 1; }
+    json=$(( 10#$value ))
     ;;
   density)
     case "$value" in
@@ -220,7 +232,7 @@ set | set-json)
 
   # Display settings are read live by the panel and the bar widget, so there
   # is nothing to regenerate or reload.
-  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider", "windowIcons", "clickToSwitch", "accent", "panelAccent", "indicatorAccent"] | length' <<<"$patch") == 0 ]]; then
+  if [[ $(jq -r 'keys - ["labels", "density", "fontSize", "mode", "popup", "indicator", "divider", "windowIcons", "clickToSwitch", "accent", "panelAccent", "indicatorAccent", "scale", "presets"] | length' <<<"$patch") == 0 ]]; then
     echo "tandem-config: appearance updated"
     exit 0
   fi
