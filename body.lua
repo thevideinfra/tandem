@@ -61,6 +61,16 @@ local switches = 0   -- only the latest switch's timer may end settling
 -- switch. It ignores events while this is set.
 local moving = false
 
+-- Hyprland 0.56 wants set_workspace({ workspace = id }); 0.57 wants the plain
+-- selector. pcall cannot tell them apart -- the rejection is logged, not thrown.
+local major, minor = tostring(hl.version()):match("^(%d+)%.(%d+)")
+local plain_selector = not major or tonumber(major) > 0 or tonumber(minor) >= 57
+
+local function set_workspace(monitor, id)
+  local value = tostring(id)
+  monitor:set_workspace(plain_selector and value or { workspace = value })
+end
+
 -- Put any monitor that is off `desk` back on it. Monitors already there are
 -- left alone, since set_workspace also moves focus.
 local function realign(desk)
@@ -70,7 +80,7 @@ local function realign(desk)
     local ws = monitor and monitor.active_workspace
     local want = workspace(desk, index)
     if monitor and not (ws and ws.id == want) then
-      monitor:set_workspace({ workspace = tostring(want) })
+      set_workspace(monitor, want)
     end
   end
   moving = false
@@ -89,7 +99,7 @@ local function show(desk)
   moving = true
   for index, name in ipairs(MONITORS) do
     local monitor = hl.get_monitor(name)
-    if monitor then monitor:set_workspace({ workspace = tostring(workspace(desk, index)) }) end
+    if monitor then set_workspace(monitor, workspace(desk, index)) end
   end
   moving = false
   hl.timer(function() if desired then realign(desired) end end, { timeout = 150, type = "oneshot" })
@@ -199,6 +209,7 @@ end
 -- missing button-up to unpin, stranding the window on every desktop. See
 -- NOTES.md.
 local drag = nil
+local carried = false   -- a carry just ended; ignore the re-sent press
 
 local function axis(value, key, index)
   if type(value) ~= "table" then return nil end
@@ -230,10 +241,10 @@ end
 hl.unbind("SUPER + mouse:272")
 o.bind("SUPER + mouse:272", "Move window", function()
   local window = hl.get_active_window()
-  drag = window and window.address or nil
+  drag = (not carried) and window and window.address or nil
   hl.dispatch(hl.dsp.window.drag())
 end, { mouse = true })
-o.bind("SUPER + mouse:272", nil, function() drag = nil end, { mouse = true, release = true })
+o.bind("SUPER + mouse:272", nil, function() drag = nil end, { release = true })
 
 -- Focus landing on a different window means the drag is over. A momentary
 -- nil active window does not -- that happens mid-move, while still dragging.
@@ -250,6 +261,11 @@ local function go(desk)
   local window = drag_target()
   if not window then return show(desk) end
   drag = nil
+  -- Hyprland re-sends the held press on the new desktop and no release ever
+  -- follows, which would re-arm the record and carry the window back on the
+  -- next switch. A deliberate re-grab within the window is not armed.
+  carried = true
+  hl.timer(function() carried = false end, { timeout = 500, type = "oneshot" })
   send(desk, window)
 end
 
